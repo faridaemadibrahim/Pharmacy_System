@@ -12,7 +12,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Enhanced Pharmacy Management System GUI with File Operations
+ * Enhanced Pharmacy Management System GUI with File Operations and Dynamic Dashboard
  * @author PharmacySystem
  */
 public class PharmacyGUI extends JFrame {
@@ -29,6 +29,9 @@ public class PharmacyGUI extends JFrame {
     private JPanel loginPanel, mainPanel;
     private JTextField usernameField, passwordField;
     private JButton loginButton, logoutButton;
+    
+    // Dashboard Components - Added for dynamic refresh
+    private JLabel totalProductsLabel, totalCustomersLabel, ordersTodayLabel, lowStockLabel;
     
     // Product Management
     private JTable productTable;
@@ -192,24 +195,31 @@ public class PharmacyGUI extends JFrame {
         JPanel dashboard = new JPanel(new GridLayout(2, 2, 10, 10));
         dashboard.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
-        // Statistics Cards - Updated to use correct methods
-        dashboard.add(createStatCard("Total Products", 
+        // Create statistics cards with stored label references for dynamic updates
+        dashboard.add(createStatCardWithReference("Total Products", 
             String.valueOf(inventory.getProducts().size()), 
-            new Color(52, 152, 219)));
-        dashboard.add(createStatCard("Total Customers", 
+            new Color(52, 152, 219), 
+            totalProductsLabel = new JLabel()));
+            
+        dashboard.add(createStatCardWithReference("Total Customers", 
             String.valueOf(customers.size()), 
-            new Color(46, 204, 113)));
-        dashboard.add(createStatCard("Orders Today", 
+            new Color(46, 204, 113), 
+            totalCustomersLabel = new JLabel()));
+            
+        dashboard.add(createStatCardWithReference("Orders Today", 
             String.valueOf(orders.size()), 
-            new Color(155, 89, 182)));
-        dashboard.add(createStatCard("Low Stock Items", 
+            new Color(155, 89, 182), 
+            ordersTodayLabel = new JLabel()));
+            
+        dashboard.add(createStatCardWithReference("Low Stock Items", 
             String.valueOf(getLowStockCount()), 
-            new Color(231, 76, 60)));
+            new Color(231, 76, 60), 
+            lowStockLabel = new JLabel()));
         
         return dashboard;
     }
     
-    private JPanel createStatCard(String title, String value, Color color) {
+    private JPanel createStatCardWithReference(String title, String value, Color color, JLabel valueLabel) {
         JPanel card = new JPanel(new BorderLayout());
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createLineBorder(color, 2));
@@ -218,7 +228,8 @@ public class PharmacyGUI extends JFrame {
         titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
         titleLabel.setForeground(color);
         
-        JLabel valueLabel = new JLabel(value, SwingConstants.CENTER);
+        valueLabel.setText(value);
+        valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
         valueLabel.setFont(new Font("Arial", Font.BOLD, 36));
         valueLabel.setForeground(color);
         
@@ -587,6 +598,7 @@ public class PharmacyGUI extends JFrame {
             inventory.addProduct(product);
             refreshProductTable();
             refreshAvailableProductsTable();
+            refreshDashboard(); // Added for dynamic dashboard update
             clearProductFields();
             
             JOptionPane.showMessageDialog(this, "Product added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -611,6 +623,7 @@ public class PharmacyGUI extends JFrame {
         
         refreshCustomerTable();
         refreshCustomerComboBox();
+        refreshDashboard(); // Added for dynamic dashboard update
         clearCustomerFields();
         
         JOptionPane.showMessageDialog(this, "Customer added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -746,11 +759,12 @@ public class PharmacyGUI extends JFrame {
             // Clear cart
             currentCart.clear();
             
-            // Refresh all displays
+            // Refresh all displays including dashboard
             refreshCartTable();
             refreshProductTable();
             refreshAvailableProductsTable();
             refreshOrderHistoryTable();
+            refreshDashboard(); // Added for dynamic dashboard update
             
             // Show success message
             JOptionPane.showMessageDialog(this, 
@@ -764,6 +778,22 @@ public class PharmacyGUI extends JFrame {
         }
     }
     
+    // ===================== Dynamic Dashboard Refresh Method =====================
+    private void refreshDashboard() {
+        if (totalProductsLabel != null) {
+            totalProductsLabel.setText(String.valueOf(inventory.getProducts().size()));
+        }
+        if (totalCustomersLabel != null) {
+            totalCustomersLabel.setText(String.valueOf(customers.size()));
+        }
+        if (ordersTodayLabel != null) {
+            ordersTodayLabel.setText(String.valueOf(orders.size()));
+        }
+        if (lowStockLabel != null) {
+            lowStockLabel.setText(String.valueOf(getLowStockCount()));
+        }
+    }
+    
     // ===================== Refresh Methods =====================
     private void refreshAllTables() {
         refreshProductTable();
@@ -772,6 +802,7 @@ public class PharmacyGUI extends JFrame {
         refreshCartTable();
         refreshOrderHistoryTable();
         refreshCustomerComboBox();
+        refreshDashboard(); // Added for dynamic dashboard update
     }
     
     private void refreshProductTable() {
@@ -909,7 +940,20 @@ public class PharmacyGUI extends JFrame {
     // ===================== Main Method =====================
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
+            try {
+                // Set Nimbus look and feel for better appearance
+                for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                    if ("Nimbus".equals(info.getName())) {
+                        UIManager.setLookAndFeel(info.getClassName());
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                // If Nimbus is not available, use default look and feel
+                System.err.println("Could not set Nimbus look and feel, using default: " + e.getMessage());
+            }
             
             new PharmacyGUI().setVisible(true);
         });
-    }}
+    }
+}
