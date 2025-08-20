@@ -113,28 +113,39 @@ public class PharmacyGUI extends JFrame {
     
     private void createLoginPanel() {
         loginPanel = new JPanel(new GridBagLayout());
-        loginPanel.setBackground(new Color(240, 248, 255));
+        loginPanel.setBackground(new Color(170, 200, 225));
         
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         
         // Title
-        JLabel titleLabel = new JLabel("Pharmacy Management System");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(0, 100, 0));
+        ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
+        Image scaledImage = originalIcon.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
+        ImageIcon scaledIcon = new ImageIcon(scaledImage);
+        JLabel titleLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
+        titleLabel.setFont(new Font("Palatino Linotype", Font.BOLD, 40));
+        titleLabel.setForeground(new Color(50, 50, 225));
+        titleLabel.setHorizontalTextPosition(JLabel.CENTER);
+        titleLabel.setVerticalTextPosition(JLabel.BOTTOM);
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
         loginPanel.add(titleLabel, gbc);
         
         // Username
         gbc.gridwidth = 1; gbc.gridy = 1;
-        loginPanel.add(new JLabel("Username:"), gbc);
+        JLabel usernameLabel = new JLabel("Username :");
+        usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // حجم الخط أكبر
+        usernameLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/user1.png")));
+        loginPanel.add(usernameLabel, gbc);
         gbc.gridx = 1;
         usernameField = new JTextField(15);
         loginPanel.add(usernameField, gbc);
         
         // Password
         gbc.gridx = 0; gbc.gridy = 2;
-        loginPanel.add(new JLabel("Password:"), gbc);
+        JLabel passwordLabel = new JLabel("Password :");
+        passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // نفس الحجم
+        passwordLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/lock.png")));
+        loginPanel.add(passwordLabel, gbc);
         gbc.gridx = 1;
         passwordField = new JPasswordField(15);
         loginPanel.add(passwordField, gbc);
@@ -142,18 +153,18 @@ public class PharmacyGUI extends JFrame {
         // Login Button
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
         loginButton = new JButton("Login");
-        loginButton.setBackground(new Color(0, 150, 0));
+        loginButton.setBackground(new Color(0, 0, 139));
         loginButton.setForeground(Color.WHITE);
-        loginButton.setFont(new Font("Arial", Font.BOLD, 14));
+        loginButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
         loginButton.addActionListener(e -> performLogin());
         loginPanel.add(loginButton, gbc);
         
         // Demo credentials info
-        gbc.gridy = 4;
-        JLabel infoLabel = new JLabel("<html><center>Demo Credentials:<br>Username: Farida<br>Password: 123456</center></html>");
-        infoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        infoLabel.setForeground(Color.GRAY);
-        loginPanel.add(infoLabel, gbc);
+//        gbc.gridy = 4;
+//        JLabel infoLabel = new JLabel("<html><center>Demo Credentials:<br>Username: Farida<br>Password: 123456</center></html>");
+//        infoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+//        infoLabel.setForeground(Color.GRAY);
+//        loginPanel.add(infoLabel, gbc);
         
         // Enter key support
         getRootPane().setDefaultButton(loginButton);
@@ -164,12 +175,14 @@ public class PharmacyGUI extends JFrame {
         
         // Header Panel
         JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setBackground(new Color(0, 100, 0));
+        headerPanel.setBackground(new Color(170, 200, 225));
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-        
-        JLabel headerLabel = new JLabel("Pharmacy Management System");
-        headerLabel.setFont(new Font("Arial", Font.BOLD, 20));
-        headerLabel.setForeground(Color.WHITE);
+        ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
+        Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+        ImageIcon scaledIcon = new ImageIcon(scaledImage);
+        JLabel headerLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
+        headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
+        headerLabel.setForeground(new Color(50, 50, 225));
         
         logoutButton = new JButton("Logout");
         logoutButton.setBackground(new Color(200, 50, 50));
@@ -181,19 +194,22 @@ public class PharmacyGUI extends JFrame {
         
         // Main Tabbed Pane
         mainTabbedPane = new JTabbedPane();
-        mainTabbedPane.addTab("Dashboard", createDashboardPanel());
-        mainTabbedPane.addTab("Products", createProductPanel());
-        mainTabbedPane.addTab("Customers", createCustomerPanel());
         mainTabbedPane.addTab("Sales", createSalesPanel());
+        mainTabbedPane.addTab("Customers", createCustomerPanel());
+        mainTabbedPane.addTab("Products", createProductPanel());
         mainTabbedPane.addTab("Order History", createOrderHistoryPanel());
+        mainTabbedPane.addTab("Dashboard", createDashboardPanel());
         
         mainPanel.add(headerPanel, BorderLayout.NORTH);
         mainPanel.add(mainTabbedPane, BorderLayout.CENTER);
+        mainPanel.setBackground(new Color(170, 200, 225));
     }
     
     private JPanel createDashboardPanel() {
         JPanel dashboard = new JPanel(new GridLayout(2, 2, 10, 10));
         dashboard.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        dashboard.setBackground(new Color(170, 200, 225));
         
         // Create statistics cards with stored label references for dynamic updates
         dashboard.add(createStatCardWithReference("Total Products", 
@@ -240,35 +256,59 @@ public class PharmacyGUI extends JFrame {
     }
     
     private JPanel createProductPanel() {
-        JPanel productPanel = new JPanel(new BorderLayout(10, 10));
-        productPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        
-        // Product Table
-        productTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Type", "Price", "Quantity", "Special"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        productTable = new JTable(productTableModel);
-        productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        refreshProductTable();
-        
-        JScrollPane productScrollPane = new JScrollPane(productTable);
-        productScrollPane.setBorder(new TitledBorder("Product Inventory"));
-        
-        // Product Form Panel
-        JPanel productFormPanel = createProductFormPanel();
-        
-        productPanel.add(productScrollPane, BorderLayout.CENTER);
-        productPanel.add(productFormPanel, BorderLayout.SOUTH);
-        
-        return productPanel;
-    }
+    JPanel productPanel = new JPanel(new BorderLayout(10, 10));
+    productPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    
+    productPanel.setBackground(new Color(170, 200, 225));
+    
+    // Product Table
+    productTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Type", "Price", "Quantity", "Special"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    productTable = new JTable(productTableModel);
+    productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+    // Product Table
+productTable = new JTable(productTableModel);
+
+// ألوان الجدول نفسه
+productTable.setBackground(new Color(200, 220, 255));  // خلفية الصفوف
+productTable.setForeground(Color.BLACK);               // لون الخط
+productTable.setGridColor(new Color(120, 150, 200));   // لون الخطوط بين الخلايا
+
+// ألوان الهيدر
+productTable.getTableHeader().setBackground(new Color(70, 130, 180));
+productTable.getTableHeader().setForeground(Color.BLACK);
+
+// ScrollPane
+JScrollPane productScrollPane = new JScrollPane(productTable);
+productScrollPane.getViewport().setBackground(new Color(200, 220, 255)); // الخلفية بعد آخر صف
+
+// Panel خاص بالبرودكت
+productPanel.setBackground(new Color(180, 200, 240)); // خلفية البانيل ككل
+productPanel.setBorder(BorderFactory.createTitledBorder("Product Inventory"));
+
+// إضافة الجدول للبانيل
+productPanel.add(productScrollPane, BorderLayout.CENTER);
+
+    refreshProductTable();
+    
+    
+    // Product Form Panel
+    JPanel productFormPanel = createProductFormPanel();
+    productPanel.add(productFormPanel, BorderLayout.NORTH);
+    productPanel.add(productScrollPane, BorderLayout.CENTER);
+    
+    return productPanel;
+}
+
     
     private JPanel createProductFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBorder(new TitledBorder("Add/Update Product"));
+        formPanel.setBackground(new Color(170, 200, 225));
         
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -334,34 +374,45 @@ public class PharmacyGUI extends JFrame {
     }
     
     private JPanel createCustomerPanel() {
-        JPanel customerPanel = new JPanel(new BorderLayout(10, 10));
-        customerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        
-        // Customer Table
-        customerTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Phone"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        customerTable = new JTable(customerTableModel);
-        refreshCustomerTable();
-        
-        JScrollPane customerScrollPane = new JScrollPane(customerTable);
-        customerScrollPane.setBorder(new TitledBorder("Customer List"));
-        
-        // Customer Form
-        JPanel customerFormPanel = createCustomerFormPanel();
-        
-        customerPanel.add(customerScrollPane, BorderLayout.CENTER);
-        customerPanel.add(customerFormPanel, BorderLayout.SOUTH);
-        
-        return customerPanel;
-    }
+    JPanel customerPanel = new JPanel(new BorderLayout(10, 10));
+    customerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    
+    customerPanel.setBackground(new Color(170, 200, 225));
+    
+    // Customer Table
+    customerTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Phone"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    customerTable = new JTable(customerTableModel);
+    customerTable.setBackground(new Color(200, 220, 255));
+    customerTable.setForeground(Color.BLACK);
+    customerTable.setGridColor(new Color(120, 150, 200));
+    customerTable.getTableHeader().setBackground(new Color(70, 130, 180));
+    customerTable.getTableHeader().setForeground(Color.BLACK);
+    JScrollPane customerScrollPane = new JScrollPane(customerTable);
+    customerScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+    customerPanel.setBackground(new Color(180, 200, 240));
+    customerPanel.setBorder(BorderFactory.createTitledBorder("Customer List"));
+    customerPanel.add(customerScrollPane, BorderLayout.CENTER);
+
+    refreshCustomerTable();
+    
+    // Customer Form
+    JPanel customerFormPanel = createCustomerFormPanel();
+    customerPanel.add(customerFormPanel, BorderLayout.NORTH);
+    customerPanel.add(customerScrollPane, BorderLayout.CENTER);
+    
+    return customerPanel;
+}
+
     
     private JPanel createCustomerFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBorder(new TitledBorder("Add Customer"));
+        formPanel.setBackground(new Color(170, 200, 225));
         
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -398,22 +449,33 @@ public class PharmacyGUI extends JFrame {
     
     private JPanel createSalesPanel() {
         JPanel salesPanel = new JPanel(new BorderLayout(10, 10));
-        salesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        
-        // Left side - Available Products
-        JPanel leftPanel = new JPanel(new BorderLayout());
-        
-        availableProductsModel = new DefaultTableModel(new String[]{"ID", "Name", "Price", "Stock"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        availableProductsTable = new JTable(availableProductsModel);
-        refreshAvailableProductsTable();
-        
-        JScrollPane availableProductsScrollPane = new JScrollPane(availableProductsTable);
-        availableProductsScrollPane.setBorder(new TitledBorder("Available Products"));
+    salesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    salesPanel.setBackground(new Color(170, 200, 225));
+
+    // Left side - Available Products
+    JPanel leftPanel = new JPanel(new BorderLayout());
+    leftPanel.setBackground(new Color(170, 200, 225));
+
+    availableProductsModel = new DefaultTableModel(new String[]{"ID", "Name", "Price", "Stock"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    availableProductsTable = new JTable(availableProductsModel);
+
+    // تنسيق جدول المنتجات
+    availableProductsTable.setBackground(new Color(200, 220, 255));
+    availableProductsTable.setForeground(Color.BLACK);
+    availableProductsTable.setGridColor(new Color(120, 150, 200));
+    availableProductsTable.getTableHeader().setBackground(new Color(70, 130, 180));
+    availableProductsTable.getTableHeader().setForeground(Color.BLACK);
+
+    refreshAvailableProductsTable();
+
+    JScrollPane availableProductsScrollPane = new JScrollPane(availableProductsTable);
+    availableProductsScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+    availableProductsScrollPane.setBorder(new TitledBorder("Available Products"));
         
         JButton addToCartBtn = new JButton("Add to Cart");
         addToCartBtn.setBackground(new Color(0, 150, 0));
@@ -425,10 +487,12 @@ public class PharmacyGUI extends JFrame {
         
         // Right side - Cart and Customer Selection
         JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
+        rightPanel.setBackground(new Color(170, 200, 225));
         
         // Customer Selection
         JPanel customerSelectionPanel = new JPanel(new FlowLayout());
         customerSelectionPanel.setBorder(new TitledBorder("Select Customer"));
+        customerSelectionPanel.setBackground(new Color(170, 200, 225));
         customerComboBox = new JComboBox<>();
         refreshCustomerComboBox();
         customerSelectionPanel.add(new JLabel("Customer:"));
@@ -436,35 +500,45 @@ public class PharmacyGUI extends JFrame {
         
         // Cart Table
         cartModel = new DefaultTableModel(new String[]{"Product", "Quantity", "Price", "Subtotal"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return column == 1; // Only quantity column editable
-            }
-        };
-        cartTable = new JTable(cartModel);
-        cartTable.getModel().addTableModelListener(e -> {
-            if (e.getColumn() == 1) { // Quantity column changed
-                updateCartQuantity(e.getFirstRow());
-            }
-        });
-        
-        JScrollPane cartScrollPane = new JScrollPane(cartTable);
-        cartScrollPane.setBorder(new TitledBorder("Shopping Cart"));
-        
-        // Cart Controls
-        JPanel cartControlsPanel = new JPanel(new BorderLayout());
-        
-        JPanel cartButtonsPanel = new JPanel(new FlowLayout());
-        JButton removeFromCartBtn = new JButton("Remove Selected");
-        removeFromCartBtn.addActionListener(e -> removeFromCart());
-        JButton clearCartBtn = new JButton("Clear Cart");
-        clearCartBtn.addActionListener(e -> clearCart());
-        
-        cartButtonsPanel.add(removeFromCartBtn);
-        cartButtonsPanel.add(clearCartBtn);
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return column == 1; // Only quantity column editable
+        }
+    };
+    cartTable = new JTable(cartModel);
+
+    // تنسيق جدول الكارت
+    cartTable.setBackground(new Color(200, 220, 255));
+    cartTable.setForeground(Color.BLACK);
+    cartTable.setGridColor(new Color(120, 150, 200));
+    cartTable.getTableHeader().setBackground(new Color(70, 130, 180));
+    cartTable.getTableHeader().setForeground(Color.BLACK);
+
+    cartTable.getModel().addTableModelListener(e -> {
+        if (e.getColumn() == 1) { // Quantity column changed
+            updateCartQuantity(e.getFirstRow());
+        }
+    });
+
+    JScrollPane cartScrollPane = new JScrollPane(cartTable);
+    cartScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+    cartScrollPane.setBorder(new TitledBorder("Shopping Cart"));
+
+    // Cart Controls
+    JPanel cartControlsPanel = new JPanel(new BorderLayout());
+    JPanel cartButtonsPanel = new JPanel(new FlowLayout());
+    cartButtonsPanel.setBackground(new Color(170, 200, 225));
+    JButton removeFromCartBtn = new JButton("Remove Selected");
+    removeFromCartBtn.addActionListener(e -> removeFromCart());
+    JButton clearCartBtn = new JButton("Clear Cart");
+    clearCartBtn.addActionListener(e -> clearCart());
+    
+    cartButtonsPanel.add(removeFromCartBtn);
+    cartButtonsPanel.add(clearCartBtn);
         
         // Total and Process Order
         JPanel totalPanel = new JPanel(new BorderLayout());
+        totalPanel.setBackground(new Color(170, 200, 225));
         totalLabel = new JLabel("Total: $0.00", SwingConstants.RIGHT);
         totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
         
@@ -494,26 +568,34 @@ public class PharmacyGUI extends JFrame {
     }
     
     private JPanel createOrderHistoryPanel() {
-        JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
-        orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        
-        // Order History Table
-        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        orderHistoryTable = new JTable(orderHistoryModel);
-        refreshOrderHistoryTable();
-        
-        JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
-        orderScrollPane.setBorder(new TitledBorder("Order History"));
-        
-        orderPanel.add(orderScrollPane, BorderLayout.CENTER);
-        
-        return orderPanel;
-    }
+    JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
+    orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    
+    orderPanel.setBackground(new Color(170, 200, 225));
+
+    // Order History Table
+    orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    orderHistoryTable = new JTable(orderHistoryModel);
+    orderHistoryTable.setBackground(new Color(200, 220, 255));
+    orderHistoryTable.setForeground(Color.BLACK);
+    orderHistoryTable.setGridColor(new Color(120, 150, 200));
+    orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
+    orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
+    JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
+    orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+    orderScrollPane.setBorder(new TitledBorder("Order History"));
+    orderPanel.add(orderScrollPane, BorderLayout.CENTER);
+    
+    refreshOrderHistoryTable();
+
+    return orderPanel;
+}
+
     
     // ===================== Event Handlers =====================
     private void performLogin() {
