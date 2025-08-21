@@ -1,5 +1,4 @@
 package pharmacy;
-
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.border.TitledBorder;
@@ -10,9 +9,11 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
 
 /**
- * Enhanced Pharmacy Management System GUI with File Operations and Dynamic Dashboard
+ * Enhanced Pharmacy Management System GUI with Persistent Shift State
  * @author PharmacySystem
  */
 public class PharmacyGUI extends JFrame {
@@ -30,9 +31,14 @@ public class PharmacyGUI extends JFrame {
     private JTextField usernameField, passwordField;
     private JButton loginButton, logoutButton;
     private JButton endShiftButton;
-private int currentShiftNumber = 1;
-private List<Order> allHistoricalOrders; // Keeps all orders ever made
-private Date shiftStartTime;
+    
+    // Shift management
+    private int currentShiftNumber = 1;
+    private List<Order> allHistoricalOrders; // Keeps all orders ever made
+    private Date shiftStartTime;
+    private static final String SHIFT_STATE_FILE = "current_shift.txt";
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    
     // Dashboard Components - Added for dynamic refresh
     private JLabel totalProductsLabel, totalCustomersLabel, ordersTodayLabel, lowStockLabel;
     
@@ -65,30 +71,136 @@ private Date shiftStartTime;
         initializeGUI();
         showLoginScreen();
     }
+    
+    /**
+     * Load current shift state from file when application starts
+     */
+    private void loadShiftState() {
+        File shiftFile = new File(SHIFT_STATE_FILE);
+        if (shiftFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(shiftFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("SHIFT_NUMBER=")) {
+                        currentShiftNumber = Integer.parseInt(line.substring("SHIFT_NUMBER=".length()));
+                    } else if (line.startsWith("SHIFT_START_TIME=")) {
+                        String timeStr = line.substring("SHIFT_START_TIME=".length());
+                        try {
+                            shiftStartTime = DATE_FORMAT.parse(timeStr);
+                        } catch (ParseException e) {
+                            System.err.println("Error parsing shift start time: " + e.getMessage());
+                            shiftStartTime = new Date(); // Default to current time
+                        }
+                    }
+                }
+                System.out.println("Loaded existing shift state: Shift " + currentShiftNumber + 
+                                 ", Started: " + shiftStartTime);
+            } catch (IOException | NumberFormatException e) {
+                System.err.println("Error loading shift state: " + e.getMessage());
+                initializeNewShift();
+            }
+        } else {
+            initializeNewShift();
+        }
+    }
+    
+    /**
+     * Save current shift state to file
+     */
+    private void saveShiftState() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(SHIFT_STATE_FILE))) {
+            writer.println("SHIFT_NUMBER=" + currentShiftNumber);
+            writer.println("SHIFT_START_TIME=" + DATE_FORMAT.format(shiftStartTime));
+            System.out.println("Saved shift state: Shift " + currentShiftNumber);
+        } catch (IOException e) {
+            System.err.println("Error saving shift state: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Initialize a new shift
+     */
+    private void initializeNewShift() {
+        currentShiftNumber = 1;
+        shiftStartTime = new Date();
+        saveShiftState();
+    }
+    
+    /**
+     * Load current shift orders (orders made in the current shift)
+     */
+    private void loadCurrentShiftOrders() {
+        // Load all orders from file
+        List<Order> allOrders = Order.loadOrdersFromFile(customers);
+        allHistoricalOrders = new ArrayList<>(allOrders);
+        
+        // Filter orders for current shift by loading shift-specific order file
+        String shiftOrdersFile = "shift_" + currentShiftNumber + "_orders.txt";
+        File file = new File(shiftOrdersFile);
+        
+        orders = new ArrayList<>();
+        
+        if (file.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("ORDER_ID=")) {
+                        int orderId = Integer.parseInt(line.substring("ORDER_ID=".length()));
+                        // Find this order in all historical orders and add to current shift
+                        for (Order order : allHistoricalOrders) {
+                            if (order.getOrderId() == orderId) {
+                                orders.add(order);
+                                break;
+                            }
+                        }
+                    }
+                }
+                System.out.println("Loaded " + orders.size() + " orders for current shift " + currentShiftNumber);
+            } catch (IOException | NumberFormatException e) {
+                System.err.println("Error loading current shift orders: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Save current shift orders to shift-specific file
+     */
+    private void saveCurrentShiftOrders() {
+        String shiftOrdersFile = "shift_" + currentShiftNumber + "_orders.txt";
+        try (PrintWriter writer = new PrintWriter(new FileWriter(shiftOrdersFile))) {
+            for (Order order : orders) {
+                writer.println("ORDER_ID=" + order.getOrderId());
+            }
+            System.out.println("Saved " + orders.size() + " orders for  current shift " + currentShiftNumber);
+        } catch (IOException e) {
+            System.err.println("Error saving current shift orders: " + e.getMessage());
+        }
+    }
+    
     private void initializeShiftData() {
-    // Load all historical orders (never gets cleared)
-    allHistoricalOrders = Order.loadOrdersFromFile(customers);
+        // Load existing shift state or create new one
+        loadShiftState();
+        
+        // Load current shift orders
+        loadCurrentShiftOrders();
+        
+        System.out.println("Current Shift " + currentShiftNumber + " initialized with " + 
+                         orders.size() + " orders");
+    }
     
-    // Current shift orders start empty (or load current shift if exists)
-    orders = new ArrayList<>();
-    
-    // Set shift start time
-    shiftStartTime = new Date();
-    
-    System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
-}
     private void initializeData() {
         // Initialize core data structures
         inventory = new Inventory();
         currentCart = new ArrayList<>();
-
         // Load existing customers from file
         Customer.initializeLastId("customers.txt");
         customers = Customer.loadCustomersFromFile("customers.txt");
-
-        // Load existing orders from file
-        orders = Order.loadOrdersFromFile(customers);
+        
+        // Initialize shift data (this will load current shift state and orders)
         initializeShiftData();
+        
         // Add some sample data if files are empty
         if (customers.isEmpty()) {
             customers.add(new Customer("Farida", "01012345678"));
@@ -99,7 +211,6 @@ private Date shiftStartTime;
                 c.saveToFile("customers.txt");
             }
         }
-
         // Only initialize sample inventory if completely empty AND no file exists
         if (inventory.getProducts().isEmpty()) {
             File inventoryFile = new File("inventory.txt");
@@ -114,9 +225,20 @@ private Date shiftStartTime;
     
     private void initializeGUI() {
         setTitle("Pharmacy Management System");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setSize(1200, 800);
         setLocationRelativeTo(null);
+        
+        // Add window closing listener to save shift state
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                // Save current shift state before closing
+                saveShiftState();
+                saveCurrentShiftOrders();
+                System.exit(0);
+            }
+        });
         
         // Create main container
         setLayout(new BorderLayout());
@@ -150,7 +272,7 @@ private Date shiftStartTime;
         // Username
         gbc.gridwidth = 1; gbc.gridy = 1;
         JLabel usernameLabel = new JLabel("Username :");
-        usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // حجم الخط أكبر
+        usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         usernameLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/user1.png")));
         loginPanel.add(usernameLabel, gbc);
         gbc.gridx = 1;
@@ -160,7 +282,7 @@ private Date shiftStartTime;
         // Password
         gbc.gridx = 0; gbc.gridy = 2;
         JLabel passwordLabel = new JLabel("Password :");
-        passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18)); // نفس الحجم
+        passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         passwordLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/lock.png")));
         loginPanel.add(passwordLabel, gbc);
         gbc.gridx = 1;
@@ -176,233 +298,244 @@ private Date shiftStartTime;
         loginButton.addActionListener(e -> performLogin());
         loginPanel.add(loginButton, gbc);
         
-        // Demo credentials info
-//        gbc.gridy = 4;
-//        JLabel infoLabel = new JLabel("<html><center>Demo Credentials:<br>Username: Farida<br>Password: 123456</center></html>");
-//        infoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-//        infoLabel.setForeground(Color.GRAY);
-//        loginPanel.add(infoLabel, gbc);
-        
         // Enter key support
         getRootPane().setDefaultButton(loginButton);
     }
+    
     private void endCurrentShift() {
-    // Show confirmation dialog
-    int choice = JOptionPane.showConfirmDialog(
-        this,
-        "Are you sure you want to end Shift " + currentShiftNumber + "?\n\n" +
-        "This will:\n" +
-        "• Clear current shift orders from display\n" +
-        "• Start a new shift\n" +
-        "• All orders remain saved in pharmacy records\n\n" +
-        "Current shift has " + orders.size() + " orders",
-        "End Shift Confirmation",
-        JOptionPane.YES_NO_OPTION,
-        JOptionPane.QUESTION_MESSAGE
-    );
-    
-    if (choice != JOptionPane.YES_OPTION) {
-        return;
-    }
-    
-    try {
-        // 1. Save current shift summary to a special file
-        saveShiftSummary();
-        
-        // 2. Add current shift orders to all historical orders
-        allHistoricalOrders.addAll(orders);
-        
-        // 3. Clear current shift orders (but they're still in files and allHistoricalOrders)
-        orders.clear();
-        
-        // 4. Increment shift number and reset shift start time
-        currentShiftNumber++;
-        shiftStartTime = new Date();
-        
-        // 5. Update header to show new shift number
-        updateShiftHeader();
-        
-        // 6. Refresh all displays
-        refreshAllTables();
-        refreshDashboard();
-        
-        // 7. Clear current cart if any
-        currentCart.clear();
-        refreshCartTable();
-        
-        // Show success message
-        JOptionPane.showMessageDialog(
+        // Show confirmation dialog
+        int choice = JOptionPane.showConfirmDialog(
             this,
-            "Shift ended successfully!\n\n" +
-            "Started new Shift " + currentShiftNumber + "\n" +
-            "All previous orders remain in pharmacy records",
-            "Shift Ended",
-            JOptionPane.INFORMATION_MESSAGE
+            "Are you sure you want to end Shift " + currentShiftNumber + "?\n\n" +
+            "This will:\n" +
+            "• Clear current shift orders from display\n" +
+            "• Start a new shift\n" +
+            "• All orders remain saved in pharmacy records\n\n" +
+            "Current shift has " + orders.size() + " orders",
+            "End Shift Confirmation",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE
         );
         
-        System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
-        
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(
-            this,
-            "Error ending shift: " + e.getMessage(),
-            "Shift Error",
-            JOptionPane.ERROR_MESSAGE
-        );
-        e.printStackTrace();
-    }
-}
-
-// Add method to save shift summary:
-private void saveShiftSummary() {
-    try {
-        File file = new File("shift_summaries.txt");
-        FileWriter writer = new FileWriter(file, true); // Append mode
-        PrintWriter printWriter = new PrintWriter(writer);
-        
-        // Calculate shift totals
-        double shiftTotal = 0;
-        int totalItems = 0;
-        
-        for (Order order : orders) {
-            shiftTotal += order.getTotalAmount();
-            totalItems += order.getItems().size();
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
         }
         
-        // Write shift summary
-        printWriter.println("=== SHIFT " + currentShiftNumber + " SUMMARY ===");
-        printWriter.println("Start Time: " + shiftStartTime);
-        printWriter.println("End Time: " + new Date());
-        printWriter.println("Total Orders: " + orders.size());
-        printWriter.println("Total Items Sold: " + totalItems);
-        printWriter.println("Total Revenue: $" + String.format("%.2f", shiftTotal));
-        printWriter.println("Cashier: " + (currentLogin != null ? currentLogin.getUsername() : "Unknown"));
-        printWriter.println("Orders in this shift:");
-        
-        for (Order order : orders) {
-            printWriter.println("  - Order #" + order.getOrderId() + 
-                             " | Customer: " + order.getCustomer().getName() + 
-                             " | Total: $" + String.format("%.2f", order.getTotalAmount()));
+        try {
+            // 1. Save current shift summary to a special file
+            saveShiftSummary();
+            
+            // 2. Add current shift orders to all historical orders (if not already there)
+            for (Order order : orders) {
+                if (!allHistoricalOrders.contains(order)) {
+                    allHistoricalOrders.add(order);
+                }
+            }
+            
+            // 3. Archive current shift orders file
+            String currentShiftFile = "shift_" + currentShiftNumber + "_orders.txt";
+            String archivedShiftFile = "archived_shift_" + currentShiftNumber + "_orders.txt";
+            File currentFile = new File(currentShiftFile);
+            if (currentFile.exists()) {
+                currentFile.renameTo(new File(archivedShiftFile));
+            }
+            
+            // 4. Clear current shift orders
+            orders.clear();
+            
+            // 5. Increment shift number and reset shift start time
+            currentShiftNumber++;
+            shiftStartTime = new Date();
+            
+            // 6. Save new shift state
+            saveShiftState();
+            saveCurrentShiftOrders(); // This will create empty shift file
+            
+            // 7. Update header to show new shift number
+            updateShiftHeader();
+            
+            // 8. Refresh all displays
+            refreshAllTables();
+            refreshDashboard();
+            
+            // 9. Clear current cart if any
+            currentCart.clear();
+            refreshCartTable();
+            
+            // Show success message
+            JOptionPane.showMessageDialog(
+                this,
+                "Shift ended successfully!\n\n" +
+                "Started new Shift \n" +
+                "All previous orders remain in pharmacy records",
+                "Shift Ended",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            
+            System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Error ending shift: " + e.getMessage(),
+                "Shift Error",
+                JOptionPane.ERROR_MESSAGE
+            );
+            e.printStackTrace();
         }
-        
-        printWriter.println("=====================================");
-        printWriter.println(); // Empty line
-        
-        printWriter.close();
-        writer.close();
-        
-    } catch (IOException e) {
-        System.err.println("Error saving shift summary: " + e.getMessage());
     }
-}
-
-// Add method to update header with new shift number:
-private void updateShiftHeader() {
-    // Find the header label and update it
-    Component[] components = ((JPanel) mainPanel.getComponent(0)).getComponents(); // Get header panel components
-    for (Component comp : components) {
-        if (comp instanceof JLabel) {
-            JLabel headerLabel = (JLabel) comp;
-            String currentText = headerLabel.getText();
-            if (currentText.contains("Shift")) {
-                headerLabel.setText("Pharmacy Management System - Shift " + currentShiftNumber);
-                break;
+    
+    // Add method to save shift summary:
+    private void saveShiftSummary() {
+        try {
+            File file = new File("shift_summaries.txt");
+            FileWriter writer = new FileWriter(file, true); // Append mode
+            PrintWriter printWriter = new PrintWriter(writer);
+            
+            // Calculate shift totals
+            double shiftTotal = 0;
+            int totalItems = 0;
+            
+            for (Order order : orders) {
+                shiftTotal += order.getTotalAmount();
+                totalItems += order.getItems().size();
+            }
+            
+            // Write shift summary
+            printWriter.println("=== SHIFT " + currentShiftNumber + " SUMMARY ===");
+            printWriter.println("Start Time: " + shiftStartTime);
+            printWriter.println("End Time: " + new Date());
+            printWriter.println("Total Orders: " + orders.size());
+            printWriter.println("Total Items Sold: " + totalItems);
+            printWriter.println("Total Revenue: $" + String.format("%.2f", shiftTotal));
+            printWriter.println("Cashier: " + (currentLogin != null ? currentLogin.getUsername() : "Unknown"));
+            printWriter.println("Orders in this shift:");
+            
+            for (Order order : orders) {
+                printWriter.println("  - Order #" + order.getOrderId() + 
+                                 " | Customer: " + order.getCustomer().getName() + 
+                                 " | Total: $" + String.format("%.2f", order.getTotalAmount()));
+            }
+            
+            printWriter.println("=====================================");
+            printWriter.println(); // Empty line
+            
+            printWriter.close();
+            writer.close();
+            
+        } catch (IOException e) {
+            System.err.println("Error saving shift summary: " + e.getMessage());
+        }
+    }
+    
+    // Add method to update header with new shift number:
+    private void updateShiftHeader() {
+        // Find the header label and update it
+        Component[] components = ((JPanel) mainPanel.getComponent(0)).getComponents(); // Get header panel components
+        for (Component comp : components) {
+            if (comp instanceof JLabel) {
+                JLabel headerLabel = (JLabel) comp;
+                String currentText = headerLabel.getText();
+                if (currentText.contains("Shift")) {
+                    headerLabel.setText("Pharmacy Management System" );
+                    break;
+                }
             }
         }
+        
+        // Refresh the display
+        mainPanel.revalidate();
+        mainPanel.repaint();
     }
     
-    // Refresh the display
-    mainPanel.revalidate();
-    mainPanel.repaint();
-}
-
-// Add method to view all historical orders (optional - you can add this as a menu item):
-private void showAllHistoricalOrders() {
-    JFrame historyFrame = new JFrame("Complete Order History - All Shifts");
-    historyFrame.setSize(800, 600);
-    historyFrame.setLocationRelativeTo(this);
-    
-    DefaultTableModel allOrdersModel = new DefaultTableModel(
-        new String[]{"Order ID", "Customer", "Date", "Total", "Shift", "Status"}, 0
-    ) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
+    // Add method to view all historical orders (optional - you can add this as a menu item):
+    private void showAllHistoricalOrders() {
+        JFrame historyFrame = new JFrame("Complete Order History - All Shifts");
+        historyFrame.setSize(800, 600);
+        historyFrame.setLocationRelativeTo(this);
+        
+        DefaultTableModel allOrdersModel = new DefaultTableModel(
+            new String[]{"Order ID", "Customer", "Date", "Total", "Shift", "Status"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable allOrdersTable = new JTable(allOrdersModel);
+        allOrdersTable.setBackground(new Color(200, 220, 255));
+        allOrdersTable.setForeground(Color.BLACK);
+        allOrdersTable.setGridColor(new Color(120, 150, 200));
+        
+        // Populate with all historical orders
+        for (Order order : allHistoricalOrders) {
+            allOrdersModel.addRow(new Object[]{
+                order.getOrderId(),
+                order.getCustomer().getName(),
+                order.getOrderDate(),
+                String.format("$%.2f", order.getTotalAmount()),
+                "Previous", // You could track which shift each order was from
+                order.getStatus()
+            });
         }
-    };
-    
-    JTable allOrdersTable = new JTable(allOrdersModel);
-    allOrdersTable.setBackground(new Color(200, 220, 255));
-    allOrdersTable.setForeground(Color.BLACK);
-    allOrdersTable.setGridColor(new Color(120, 150, 200));
-    
-    // Populate with all historical orders
-    for (Order order : allHistoricalOrders) {
-        allOrdersModel.addRow(new Object[]{
-            order.getOrderId(),
-            order.getCustomer().getName(),
-            order.getOrderDate(),
-            String.format("$%.2f", order.getTotalAmount()),
-            "Previous", // You could track which shift each order was from
-            order.getStatus()
-        });
+        
+        JScrollPane scrollPane = new JScrollPane(allOrdersTable);
+        historyFrame.add(scrollPane);
+        historyFrame.setVisible(true);
     }
     
-    JScrollPane scrollPane = new JScrollPane(allOrdersTable);
-    historyFrame.add(scrollPane);
-    historyFrame.setVisible(true);
-}
    private void createMainPanel() {
-    mainPanel = new JPanel(new BorderLayout());
-    
-    // Header Panel
-    JPanel headerPanel = new JPanel(new BorderLayout());
-    headerPanel.setBackground(new Color(170, 200, 225));
-    headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-    
-    // Left side - Logo and title
-    ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
-    Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
-    ImageIcon scaledIcon = new ImageIcon(scaledImage);
-    JLabel headerLabel = new JLabel("Pharmacy Management System - Shift " + currentShiftNumber, scaledIcon, JLabel.CENTER);
-    headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
-    headerLabel.setForeground(new Color(50, 50, 225));
-    
-    // Right side - Buttons panel
-    JPanel buttonPanel = new JPanel(new FlowLayout());
-    buttonPanel.setBackground(new Color(170, 200, 225));
-    
-    // End Shift Button
-    endShiftButton = new JButton("End Shift");
-    endShiftButton.setBackground(new Color(255, 140, 0)); // Orange color
-    endShiftButton.setForeground(Color.WHITE);
-    endShiftButton.setFont(new Font("Arial", Font.BOLD, 12));
-    endShiftButton.addActionListener(e -> endCurrentShift());
-    
-    // Logout Button
-    logoutButton = new JButton("Logout");
-    logoutButton.setBackground(new Color(200, 50, 50));
-    logoutButton.setForeground(Color.WHITE);
-    logoutButton.addActionListener(e -> performLogout());
-    
-    buttonPanel.add(endShiftButton);
-    buttonPanel.add(logoutButton);
-    
-    headerPanel.add(headerLabel, BorderLayout.WEST);
-    headerPanel.add(buttonPanel, BorderLayout.EAST);
-    
-    // Rest of the method remains the same...
-    mainTabbedPane = new JTabbedPane();
-    mainTabbedPane.addTab("Sales", createSalesPanel());
-    mainTabbedPane.addTab("Customers", createCustomerPanel());
-    mainTabbedPane.addTab("Products", createProductPanel());
-    mainTabbedPane.addTab("Order History", createOrderHistoryPanel());
-    mainTabbedPane.addTab("Dashboard", createDashboardPanel());
-    
-    mainPanel.add(headerPanel, BorderLayout.NORTH);
-    mainPanel.add(mainTabbedPane, BorderLayout.CENTER);
-    mainPanel.setBackground(new Color(170, 200, 225));
-}
+        mainPanel = new JPanel(new BorderLayout());
+        
+        // Header Panel
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(170, 200, 225));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        
+        // Left side - Logo and title
+        ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
+        Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+        ImageIcon scaledIcon = new ImageIcon(scaledImage);
+        JLabel headerLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
+        headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
+        headerLabel.setForeground(new Color(50, 50, 225));
+        
+        // Right side - Buttons panel
+        JPanel buttonPanel = new JPanel(new FlowLayout());
+        buttonPanel.setBackground(new Color(170, 200, 225));
+        
+        // End Shift Button
+        endShiftButton = new JButton("End Shift");
+        endShiftButton.setBackground(new Color(255, 140, 0)); // Orange color
+        endShiftButton.setForeground(Color.WHITE);
+        endShiftButton.setFont(new Font("Arial", Font.BOLD, 12));
+        endShiftButton.addActionListener(e -> endCurrentShift());
+        
+        // Logout Button
+        logoutButton = new JButton("Logout");
+        logoutButton.setBackground(new Color(200, 50, 50));
+        logoutButton.setForeground(Color.WHITE);
+        logoutButton.addActionListener(e -> performLogout());
+        
+        buttonPanel.add(endShiftButton);
+        buttonPanel.add(logoutButton);
+        
+        headerPanel.add(headerLabel, BorderLayout.WEST);
+        headerPanel.add(buttonPanel, BorderLayout.EAST);
+        
+        // Rest of the method remains the same...
+        mainTabbedPane = new JTabbedPane();
+        mainTabbedPane.addTab("Sales", createSalesPanel());
+        mainTabbedPane.addTab("Customers", createCustomerPanel());
+        mainTabbedPane.addTab("Products", createProductPanel());
+        mainTabbedPane.addTab("Order History", createOrderHistoryPanel());
+        mainTabbedPane.addTab("Dashboard", createDashboardPanel());
+        
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(mainTabbedPane, BorderLayout.CENTER);
+        mainPanel.setBackground(new Color(170, 200, 225));
+    }
     
     private JPanel createDashboardPanel() {
         JPanel dashboard = new JPanel(new GridLayout(2, 2, 10, 10));
@@ -465,7 +598,6 @@ private void showAllHistoricalOrders() {
         searchPanel.add(new JLabel("Search Products:"));
         JTextField productSearchField = new JTextField(20);
         searchPanel.add(productSearchField);
-
         // Product Table
         productTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Type", "Price", "Quantity", "Special"}, 0) {
             @Override
@@ -480,19 +612,15 @@ private void showAllHistoricalOrders() {
         productTable.setGridColor(new Color(120, 150, 200));
         productTable.getTableHeader().setBackground(new Color(70, 130, 180));
         productTable.getTableHeader().setForeground(Color.BLACK);
-
         JScrollPane productScrollPane = new JScrollPane(productTable);
         productScrollPane.getViewport().setBackground(new Color(200, 220, 255));
         productScrollPane.setBorder(BorderFactory.createTitledBorder("Product Inventory"));
-
         refreshProductTable();
-
         // Add search functionality
         productSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void changedUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
             public void removeUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
             public void insertUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
-
             public void filterProducts() {
                 String searchText = productSearchField.getText().toLowerCase();
                 productTableModel.setRowCount(0);
@@ -516,21 +644,16 @@ private void showAllHistoricalOrders() {
                 }
             }
         });
-
         // Product Form Panel
         JPanel productFormPanel = createProductFormPanel();
-
         // Combine search and form panels
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.add(searchPanel, BorderLayout.NORTH);
         topPanel.add(productFormPanel, BorderLayout.CENTER);
-
         productPanel.add(topPanel, BorderLayout.NORTH);
         productPanel.add(productScrollPane, BorderLayout.CENTER);
-
         return productPanel;
     }
-
     
     private JPanel createProductFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
@@ -624,7 +747,6 @@ private void showAllHistoricalOrders() {
     customerPanel.setBackground(new Color(180, 200, 240));
     customerPanel.setBorder(BorderFactory.createTitledBorder("Customer List"));
     customerPanel.add(customerScrollPane, BorderLayout.CENTER);
-
     refreshCustomerTable();
     
     // Customer Form
@@ -634,7 +756,6 @@ private void showAllHistoricalOrders() {
     
     return customerPanel;
 }
-
     
     private JPanel createCustomerFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
@@ -678,18 +799,15 @@ private void showAllHistoricalOrders() {
         JPanel salesPanel = new JPanel(new BorderLayout(10, 10));
         salesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         salesPanel.setBackground(new Color(170, 200, 225));
-
         // Left side - Available Products
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBackground(new Color(170, 200, 225));
-
         // Search Panel for products
         JPanel productSearchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         productSearchPanel.setBackground(new Color(170, 200, 225));
         productSearchPanel.add(new JLabel("Search Products:"));
         JTextField salesProductSearchField = new JTextField(20);
         productSearchPanel.add(salesProductSearchField);
-
         availableProductsModel = new DefaultTableModel(new String[]{"ID", "Name", "Price", "Stock"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -702,15 +820,12 @@ private void showAllHistoricalOrders() {
         availableProductsTable.setGridColor(new Color(120, 150, 200));
         availableProductsTable.getTableHeader().setBackground(new Color(70, 130, 180));
         availableProductsTable.getTableHeader().setForeground(Color.BLACK);
-
         refreshAvailableProductsTable();
-
         // Add search functionality for sales products
         salesProductSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void changedUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
             public void removeUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
             public void insertUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
-
             public void filterSalesProducts() {
                 String searchText = salesProductSearchField.getText().toLowerCase();
                 availableProductsModel.setRowCount(0);
@@ -724,25 +839,19 @@ private void showAllHistoricalOrders() {
                 }
             }
         });
-
         JScrollPane availableProductsScrollPane = new JScrollPane(availableProductsTable);
         availableProductsScrollPane.getViewport().setBackground(new Color(200, 220, 255));
         availableProductsScrollPane.setBorder(new TitledBorder("Available Products"));
-
         leftPanel.add(productSearchPanel, BorderLayout.NORTH);
-
             JButton addToCartBtn = new JButton("Add to Cart");
             addToCartBtn.setBackground(new Color(0, 150, 0));
             addToCartBtn.setForeground(Color.WHITE);
             addToCartBtn.addActionListener(e -> addToCart());
-
             leftPanel.add(availableProductsScrollPane, BorderLayout.CENTER);
             leftPanel.add(addToCartBtn, BorderLayout.SOUTH);
-
             // Right side - Cart and Customer Selection
             JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
             rightPanel.setBackground(new Color(170, 200, 225));
-
             // Customer Selection
             JPanel customerSelectionPanel = new JPanel(new FlowLayout());
             customerSelectionPanel.setBorder(new TitledBorder("Select Customer"));
@@ -751,7 +860,6 @@ private void showAllHistoricalOrders() {
             refreshCustomerComboBox();
             customerSelectionPanel.add(new JLabel("Customer:"));
             customerSelectionPanel.add(customerComboBox);
-
             // Cart Table
             cartModel = new DefaultTableModel(new String[]{"Product", "Quantity", "Price", "Subtotal"}, 0) {
             @Override
@@ -760,24 +868,20 @@ private void showAllHistoricalOrders() {
             }
         };
         cartTable = new JTable(cartModel);
-
         // تنسيق جدول الكارت
         cartTable.setBackground(new Color(200, 220, 255));
         cartTable.setForeground(Color.BLACK);
         cartTable.setGridColor(new Color(120, 150, 200));
         cartTable.getTableHeader().setBackground(new Color(70, 130, 180));
         cartTable.getTableHeader().setForeground(Color.BLACK);
-
         cartTable.getModel().addTableModelListener(e -> {
             if (e.getColumn() == 1) { // Quantity column changed
                 updateCartQuantity(e.getFirstRow());
             }
         });
-
         JScrollPane cartScrollPane = new JScrollPane(cartTable);
         cartScrollPane.getViewport().setBackground(new Color(200, 220, 255));
         cartScrollPane.setBorder(new TitledBorder("Shopping Cart"));
-
         // Cart Controls
         JPanel cartControlsPanel = new JPanel(new BorderLayout());
         JPanel cartButtonsPanel = new JPanel(new FlowLayout());
@@ -786,75 +890,36 @@ private void showAllHistoricalOrders() {
         removeFromCartBtn.addActionListener(e -> removeFromCart());
         JButton clearCartBtn = new JButton("Clear Cart");
         clearCartBtn.addActionListener(e -> clearCart());
-
         cartButtonsPanel.add(removeFromCartBtn);
         cartButtonsPanel.add(clearCartBtn);
-
             // Total and Process Order
             JPanel totalPanel = new JPanel(new BorderLayout());
             totalPanel.setBackground(new Color(170, 200, 225));
             totalLabel = new JLabel("Total: $0.00", SwingConstants.RIGHT);
             totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
-
             JButton processOrderBtn = new JButton("Process Order");
             processOrderBtn.setBackground(new Color(0, 100, 200));
             processOrderBtn.setForeground(Color.WHITE);
             processOrderBtn.setFont(new Font("Arial", Font.BOLD, 14));
             processOrderBtn.addActionListener(e -> processOrder());
-
             totalPanel.add(totalLabel, BorderLayout.NORTH);
             totalPanel.add(processOrderBtn, BorderLayout.SOUTH);
-
             cartControlsPanel.add(cartButtonsPanel, BorderLayout.NORTH);
             cartControlsPanel.add(totalPanel, BorderLayout.SOUTH);
-
             rightPanel.add(customerSelectionPanel, BorderLayout.NORTH);
             rightPanel.add(cartScrollPane, BorderLayout.CENTER);
             rightPanel.add(cartControlsPanel, BorderLayout.SOUTH);
-
             // Split Pane
             JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
             splitPane.setDividerLocation(600);
-
             salesPanel.add(splitPane, BorderLayout.CENTER);
-
             return salesPanel;
     }
     
-//    private JPanel createOrderHistoryPanel() {
-//        JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
-//        orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-//
-//        orderPanel.setBackground(new Color(170, 200, 225));
-//
-//        // Order History Table
-//        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status"}, 0) {
-//            @Override
-//            public boolean isCellEditable(int row, int column) {
-//                return false;
-//            }
-//        };
-//        orderHistoryTable = new JTable(orderHistoryModel);
-//        orderHistoryTable.setBackground(new Color(200, 220, 255));
-//        orderHistoryTable.setForeground(Color.BLACK);
-//        orderHistoryTable.setGridColor(new Color(120, 150, 200));
-//        orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
-//        orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
-//        JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
-//        orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
-//        orderScrollPane.setBorder(new TitledBorder("Order History"));
-//        orderPanel.add(orderScrollPane, BorderLayout.CENTER);
-//
-//        refreshOrderHistoryTable();
-//
-//        return orderPanel;
-//    }
-    // order ditails***
     private JPanel createOrderHistoryPanel() {
         JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
         orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         orderPanel.setBackground(new Color(170, 200, 225));
-
         // Order History Table
         orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status", "Products"}, 0) {
             @Override
@@ -868,7 +933,6 @@ private void showAllHistoricalOrders() {
         orderHistoryTable.setGridColor(new Color(120, 150, 200));
         orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
         orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
-
         // Add double-click listener to show full order details
         orderHistoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
@@ -880,14 +944,11 @@ private void showAllHistoricalOrders() {
                 }
             }
         });
-
         JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
         orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
         orderScrollPane.setBorder(new TitledBorder("Order History (Double-click for details)"));
         orderPanel.add(orderScrollPane, BorderLayout.CENTER);
-
         refreshOrderHistoryTable();
-
         return orderPanel;
     }
     
@@ -895,7 +956,6 @@ private void showAllHistoricalOrders() {
         if (orderIndex >= 0 && orderIndex < orders.size()) {
             Order order = orders.get(orderIndex);
             order.loadOrderItems(inventory.getProducts());
-
             StringBuilder details = new StringBuilder();
             details.append("Order ID: ").append(order.getOrderId()).append("\n");
             details.append("Customer: ").append(order.getCustomer().getName()).append("\n");
@@ -904,7 +964,6 @@ private void showAllHistoricalOrders() {
             details.append("Status: ").append(order.getStatus()).append("\n\n");
             details.append("Products:\n");
             details.append("----------------------------------------\n");
-
             for (OrderItem item : order.getItems()) {
                 details.append(String.format("• %s\n  Qty: %d | Price: $%.2f | Subtotal: $%.2f\n\n", 
                     item.getProduct().getName(),
@@ -912,20 +971,16 @@ private void showAllHistoricalOrders() {
                     item.getProduct().getPrice(),
                     item.calculateSubtotal()));
             }
-
             details.append("----------------------------------------\n");
             details.append(String.format("Total Amount: $%.2f", order.getTotalAmount()));
-
             JTextArea textArea = new JTextArea(details.toString());
             textArea.setEditable(false);
             textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
             JScrollPane scrollPane = new JScrollPane(textArea);
             scrollPane.setPreferredSize(new Dimension(400, 300));
-
             JOptionPane.showMessageDialog(this, scrollPane, "Order Details", JOptionPane.INFORMATION_MESSAGE);
         }
     }
-
     
     // ===================== Event Handlers =====================
     private void performLogin() {
@@ -946,6 +1001,10 @@ private void showAllHistoricalOrders() {
     }
     
     private void performLogout() {
+        // Save shift state before logout
+        saveShiftState();
+        saveCurrentShiftOrders();
+        
         if (currentLogin != null) {
             currentLogin.logout();
             currentLogin = null;
@@ -1047,25 +1106,20 @@ private void showAllHistoricalOrders() {
             JOptionPane.showMessageDialog(this, "Please select a product!", "Selection Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
         int productId = (Integer) availableProductsModel.getValueAt(selectedRow, 0);
         Product product = inventory.getProductById(productId);
-
         if (product == null || product.getQuantity() <= 0) {
             JOptionPane.showMessageDialog(this, "Product not available!", "Stock Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
         String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:", "1");
         if (quantityStr == null) return;
-
         try {
             int quantity = Integer.parseInt(quantityStr);
             if (quantity <= 0) {
                 JOptionPane.showMessageDialog(this, "Quantity must be positive!", "Input Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-
             // Check current quantity in cart for this product
             int currentCartQuantity = 0;
             OrderItem existingItem = null;
@@ -1076,7 +1130,6 @@ private void showAllHistoricalOrders() {
                     break;
                 }
             }
-
             // Check if total quantity (cart + new) exceeds available stock
             int totalQuantityNeeded = currentCartQuantity + quantity;
             if (totalQuantityNeeded > product.getQuantity()) {
@@ -1086,15 +1139,12 @@ private void showAllHistoricalOrders() {
                     "Stock Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-
             if (existingItem != null) {
                 existingItem.setQuantity(totalQuantityNeeded);
             } else {
                 currentCart.add(new OrderItem(product, quantity));
             }
-
             refreshCartTable();
-
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, "Please enter a valid number!", "Input Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -1166,8 +1216,11 @@ private void showAllHistoricalOrders() {
             // Complete the order (this saves to files)
             order.completeOrder();
             
-            // Add to orders list
+            // Add to current shift orders list
             orders.add(order);
+            
+            // Save current shift orders to file
+            saveCurrentShiftOrders();
             
             // Deduct stock from inventory
             for (OrderItem item : currentCart) {
@@ -1190,7 +1243,7 @@ private void showAllHistoricalOrders() {
             
             // Show success message
             JOptionPane.showMessageDialog(this, 
-                String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nSaved to files: orders.txt & order_details.txt", 
+                String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nSaved to files & current shift", 
                              order.getOrderId(), order.getTotalAmount()), 
                 "Success", JOptionPane.INFORMATION_MESSAGE);
                 
@@ -1241,7 +1294,6 @@ private void showAllHistoricalOrders() {
             } else {
                 special = "N/A";
             }
-
             productTableModel.addRow(new Object[]{
                 p.getProductId(),
                 p.getName(),
@@ -1296,34 +1348,28 @@ private void showAllHistoricalOrders() {
     
     private void refreshOrderHistoryTable() {
         orderHistoryModel.setRowCount(0);
-
         if (orders == null || orders.isEmpty()) {
             return;
         }
-
         for (Order o : orders) {
             String customerName = (o.getCustomer() != null) ? o.getCustomer().getName() : "Unknown";
             String orderDate = (o.getOrderDate() != null) ? o.getOrderDate().toString() : "N/A";
             String totalAmount = String.format("$%.2f", o.getTotalAmount());
             String status = (o.getStatus() != null) ? o.getStatus() : "Pending";
-
             // Only load order items if not already loaded (check if items list is empty)
             if (o.getItems().isEmpty()) {
                 o.loadOrderItems(inventory.getProducts());
             }
-
             StringBuilder productSummary = new StringBuilder();
             for (OrderItem item : o.getItems()) {
                 if (productSummary.length() > 0) productSummary.append(", ");
                 productSummary.append(item.getProduct().getName()).append(" (").append(item.getQuantity()).append(")");
             }
-
             // Truncate if too long
             String products = productSummary.toString();
             if (products.length() > 50) {
                 products = products.substring(0, 47) + "...";
             }
-
             orderHistoryModel.addRow(new Object[]{
                 o.getOrderId(),
                 customerName,
