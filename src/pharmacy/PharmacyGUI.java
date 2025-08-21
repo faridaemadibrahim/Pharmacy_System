@@ -29,7 +29,10 @@ public class PharmacyGUI extends JFrame {
     private JPanel loginPanel, mainPanel;
     private JTextField usernameField, passwordField;
     private JButton loginButton, logoutButton;
-    
+    private JButton endShiftButton;
+private int currentShiftNumber = 1;
+private List<Order> allHistoricalOrders; // Keeps all orders ever made
+private Date shiftStartTime;
     // Dashboard Components - Added for dynamic refresh
     private JLabel totalProductsLabel, totalCustomersLabel, ordersTodayLabel, lowStockLabel;
     
@@ -62,7 +65,18 @@ public class PharmacyGUI extends JFrame {
         initializeGUI();
         showLoginScreen();
     }
+    private void initializeShiftData() {
+    // Load all historical orders (never gets cleared)
+    allHistoricalOrders = Order.loadOrdersFromFile(customers);
     
+    // Current shift orders start empty (or load current shift if exists)
+    orders = new ArrayList<>();
+    
+    // Set shift start time
+    shiftStartTime = new Date();
+    
+    System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
+}
     private void initializeData() {
         // Initialize core data structures
         inventory = new Inventory();
@@ -74,7 +88,7 @@ public class PharmacyGUI extends JFrame {
 
         // Load existing orders from file
         orders = Order.loadOrdersFromFile(customers);
-
+        initializeShiftData();
         // Add some sample data if files are empty
         if (customers.isEmpty()) {
             customers.add(new Customer("Farida", "01012345678"));
@@ -172,41 +186,223 @@ public class PharmacyGUI extends JFrame {
         // Enter key support
         getRootPane().setDefaultButton(loginButton);
     }
+    private void endCurrentShift() {
+    // Show confirmation dialog
+    int choice = JOptionPane.showConfirmDialog(
+        this,
+        "Are you sure you want to end Shift " + currentShiftNumber + "?\n\n" +
+        "This will:\n" +
+        "• Clear current shift orders from display\n" +
+        "• Start a new shift\n" +
+        "• All orders remain saved in pharmacy records\n\n" +
+        "Current shift has " + orders.size() + " orders",
+        "End Shift Confirmation",
+        JOptionPane.YES_NO_OPTION,
+        JOptionPane.QUESTION_MESSAGE
+    );
     
-    private void createMainPanel() {
-        mainPanel = new JPanel(new BorderLayout());
-        
-        // Header Panel
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setBackground(new Color(170, 200, 225));
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-        ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
-        Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
-        ImageIcon scaledIcon = new ImageIcon(scaledImage);
-        JLabel headerLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
-        headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
-        headerLabel.setForeground(new Color(50, 50, 225));
-        
-        logoutButton = new JButton("Logout");
-        logoutButton.setBackground(new Color(200, 50, 50));
-        logoutButton.setForeground(Color.WHITE);
-        logoutButton.addActionListener(e -> performLogout());
-        
-        headerPanel.add(headerLabel, BorderLayout.WEST);
-        headerPanel.add(logoutButton, BorderLayout.EAST);
-        
-        // Main Tabbed Pane
-        mainTabbedPane = new JTabbedPane();
-        mainTabbedPane.addTab("Sales", createSalesPanel());
-        mainTabbedPane.addTab("Customers", createCustomerPanel());
-        mainTabbedPane.addTab("Products", createProductPanel());
-        mainTabbedPane.addTab("Order History", createOrderHistoryPanel());
-        mainTabbedPane.addTab("Dashboard", createDashboardPanel());
-        
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
-        mainPanel.add(mainTabbedPane, BorderLayout.CENTER);
-        mainPanel.setBackground(new Color(170, 200, 225));
+    if (choice != JOptionPane.YES_OPTION) {
+        return;
     }
+    
+    try {
+        // 1. Save current shift summary to a special file
+        saveShiftSummary();
+        
+        // 2. Add current shift orders to all historical orders
+        allHistoricalOrders.addAll(orders);
+        
+        // 3. Clear current shift orders (but they're still in files and allHistoricalOrders)
+        orders.clear();
+        
+        // 4. Increment shift number and reset shift start time
+        currentShiftNumber++;
+        shiftStartTime = new Date();
+        
+        // 5. Update header to show new shift number
+        updateShiftHeader();
+        
+        // 6. Refresh all displays
+        refreshAllTables();
+        refreshDashboard();
+        
+        // 7. Clear current cart if any
+        currentCart.clear();
+        refreshCartTable();
+        
+        // Show success message
+        JOptionPane.showMessageDialog(
+            this,
+            "Shift ended successfully!\n\n" +
+            "Started new Shift " + currentShiftNumber + "\n" +
+            "All previous orders remain in pharmacy records",
+            "Shift Ended",
+            JOptionPane.INFORMATION_MESSAGE
+        );
+        
+        System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
+        
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(
+            this,
+            "Error ending shift: " + e.getMessage(),
+            "Shift Error",
+            JOptionPane.ERROR_MESSAGE
+        );
+        e.printStackTrace();
+    }
+}
+
+// Add method to save shift summary:
+private void saveShiftSummary() {
+    try {
+        File file = new File("shift_summaries.txt");
+        FileWriter writer = new FileWriter(file, true); // Append mode
+        PrintWriter printWriter = new PrintWriter(writer);
+        
+        // Calculate shift totals
+        double shiftTotal = 0;
+        int totalItems = 0;
+        
+        for (Order order : orders) {
+            shiftTotal += order.getTotalAmount();
+            totalItems += order.getItems().size();
+        }
+        
+        // Write shift summary
+        printWriter.println("=== SHIFT " + currentShiftNumber + " SUMMARY ===");
+        printWriter.println("Start Time: " + shiftStartTime);
+        printWriter.println("End Time: " + new Date());
+        printWriter.println("Total Orders: " + orders.size());
+        printWriter.println("Total Items Sold: " + totalItems);
+        printWriter.println("Total Revenue: $" + String.format("%.2f", shiftTotal));
+        printWriter.println("Cashier: " + (currentLogin != null ? currentLogin.getUsername() : "Unknown"));
+        printWriter.println("Orders in this shift:");
+        
+        for (Order order : orders) {
+            printWriter.println("  - Order #" + order.getOrderId() + 
+                             " | Customer: " + order.getCustomer().getName() + 
+                             " | Total: $" + String.format("%.2f", order.getTotalAmount()));
+        }
+        
+        printWriter.println("=====================================");
+        printWriter.println(); // Empty line
+        
+        printWriter.close();
+        writer.close();
+        
+    } catch (IOException e) {
+        System.err.println("Error saving shift summary: " + e.getMessage());
+    }
+}
+
+// Add method to update header with new shift number:
+private void updateShiftHeader() {
+    // Find the header label and update it
+    Component[] components = ((JPanel) mainPanel.getComponent(0)).getComponents(); // Get header panel components
+    for (Component comp : components) {
+        if (comp instanceof JLabel) {
+            JLabel headerLabel = (JLabel) comp;
+            String currentText = headerLabel.getText();
+            if (currentText.contains("Shift")) {
+                headerLabel.setText("Pharmacy Management System - Shift " + currentShiftNumber);
+                break;
+            }
+        }
+    }
+    
+    // Refresh the display
+    mainPanel.revalidate();
+    mainPanel.repaint();
+}
+
+// Add method to view all historical orders (optional - you can add this as a menu item):
+private void showAllHistoricalOrders() {
+    JFrame historyFrame = new JFrame("Complete Order History - All Shifts");
+    historyFrame.setSize(800, 600);
+    historyFrame.setLocationRelativeTo(this);
+    
+    DefaultTableModel allOrdersModel = new DefaultTableModel(
+        new String[]{"Order ID", "Customer", "Date", "Total", "Shift", "Status"}, 0
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    
+    JTable allOrdersTable = new JTable(allOrdersModel);
+    allOrdersTable.setBackground(new Color(200, 220, 255));
+    allOrdersTable.setForeground(Color.BLACK);
+    allOrdersTable.setGridColor(new Color(120, 150, 200));
+    
+    // Populate with all historical orders
+    for (Order order : allHistoricalOrders) {
+        allOrdersModel.addRow(new Object[]{
+            order.getOrderId(),
+            order.getCustomer().getName(),
+            order.getOrderDate(),
+            String.format("$%.2f", order.getTotalAmount()),
+            "Previous", // You could track which shift each order was from
+            order.getStatus()
+        });
+    }
+    
+    JScrollPane scrollPane = new JScrollPane(allOrdersTable);
+    historyFrame.add(scrollPane);
+    historyFrame.setVisible(true);
+}
+   private void createMainPanel() {
+    mainPanel = new JPanel(new BorderLayout());
+    
+    // Header Panel
+    JPanel headerPanel = new JPanel(new BorderLayout());
+    headerPanel.setBackground(new Color(170, 200, 225));
+    headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+    
+    // Left side - Logo and title
+    ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
+    Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+    ImageIcon scaledIcon = new ImageIcon(scaledImage);
+    JLabel headerLabel = new JLabel("Pharmacy Management System - Shift " + currentShiftNumber, scaledIcon, JLabel.CENTER);
+    headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
+    headerLabel.setForeground(new Color(50, 50, 225));
+    
+    // Right side - Buttons panel
+    JPanel buttonPanel = new JPanel(new FlowLayout());
+    buttonPanel.setBackground(new Color(170, 200, 225));
+    
+    // End Shift Button
+    endShiftButton = new JButton("End Shift");
+    endShiftButton.setBackground(new Color(255, 140, 0)); // Orange color
+    endShiftButton.setForeground(Color.WHITE);
+    endShiftButton.setFont(new Font("Arial", Font.BOLD, 12));
+    endShiftButton.addActionListener(e -> endCurrentShift());
+    
+    // Logout Button
+    logoutButton = new JButton("Logout");
+    logoutButton.setBackground(new Color(200, 50, 50));
+    logoutButton.setForeground(Color.WHITE);
+    logoutButton.addActionListener(e -> performLogout());
+    
+    buttonPanel.add(endShiftButton);
+    buttonPanel.add(logoutButton);
+    
+    headerPanel.add(headerLabel, BorderLayout.WEST);
+    headerPanel.add(buttonPanel, BorderLayout.EAST);
+    
+    // Rest of the method remains the same...
+    mainTabbedPane = new JTabbedPane();
+    mainTabbedPane.addTab("Sales", createSalesPanel());
+    mainTabbedPane.addTab("Customers", createCustomerPanel());
+    mainTabbedPane.addTab("Products", createProductPanel());
+    mainTabbedPane.addTab("Order History", createOrderHistoryPanel());
+    mainTabbedPane.addTab("Dashboard", createDashboardPanel());
+    
+    mainPanel.add(headerPanel, BorderLayout.NORTH);
+    mainPanel.add(mainTabbedPane, BorderLayout.CENTER);
+    mainPanel.setBackground(new Color(170, 200, 225));
+}
     
     private JPanel createDashboardPanel() {
         JPanel dashboard = new JPanel(new GridLayout(2, 2, 10, 10));
@@ -1013,7 +1209,7 @@ public class PharmacyGUI extends JFrame {
             totalCustomersLabel.setText(String.valueOf(customers.size()));
         }
         if (ordersTodayLabel != null) {
-            ordersTodayLabel.setText(String.valueOf(orders.size()));
+           ordersTodayLabel.setText(String.valueOf(orders.size()) + " (This Shift)");
         }
         if (lowStockLabel != null) {
             lowStockLabel.setText(String.valueOf(getLowStockCount()));

@@ -1,0 +1,23 @@
+=== SHIFT 1 SUMMARY ===
+Start Time: Thu Aug 21 17:58:03 EEST 2025
+End Time: Thu Aug 21 17:58:59 EEST 2025
+Total Orders: 1
+Total Items Sold: 1
+Total Revenue: $15.00
+Cashier: Farida
+Orders in this shift:
+  - Order #7 | Customer: Farida | Total: $15.00
+=====================================
+
+=== SHIFT 1 SUMMARY ===
+Start Time: Thu Aug 21 18:07:15 EEST 2025
+End Time: Thu Aug 21 18:10:55 EEST 2025
+Total Orders: 2
+Total Items Sold: 2
+Total Revenue: $500.00
+Cashier: Ammar
+Orders in this shift:
+  - Order #8 | Customer: Farida | Total: $450.00
+  - Order #9 | Customer: Ahmed | Total: $50.00
+=====================================
+
