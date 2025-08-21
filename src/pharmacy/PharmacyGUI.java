@@ -181,7 +181,7 @@ public class PharmacyGUI extends JFrame {
     
     private void initializeShiftData() {
         // Load existing shift state or create new one
-        loadShiftState();
+        loadShiftState(); 
         
         // Load current shift orders
         loadCurrentShiftOrders();
