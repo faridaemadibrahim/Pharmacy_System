@@ -106,8 +106,7 @@ public class PharmacyGUI extends JFrame {
         
         // If no users exist, create default users
         if (userCredentials.isEmpty()) {
-            createDefaultUsers();
-            saveUsersToFile();
+            System.out.println("No users found in users.txt file");
         }
     }
     
@@ -123,7 +122,7 @@ public class PharmacyGUI extends JFrame {
                     line = line.trim();
                     if (line.isEmpty() || line.startsWith("#")) continue; // Skip empty lines and comments
                     
-                    String[] parts = line.split("=", 2);
+                    String[] parts = line.split(",", 2);
                     if (parts.length == 2) {
                         userCredentials.put(parts[0].trim(), parts[1].trim());
                     }
@@ -150,12 +149,8 @@ public class PharmacyGUI extends JFrame {
      */
     private void saveUsersToFile() {
         try (PrintWriter writer = new PrintWriter(new FileWriter(USERS_FILE))) {
-            writer.println("# Pharmacy Management System Users");
-            writer.println("# Format: username=password");
-            writer.println();
-            
             for (Map.Entry<String, String> entry : userCredentials.entrySet()) {
-                writer.println(entry.getKey() + "=" + entry.getValue());
+                writer.println(entry.getKey() + "," + entry.getValue());
             }
             
             System.out.println("Saved " + userCredentials.size() + " users to file");
@@ -418,20 +413,20 @@ public class PharmacyGUI extends JFrame {
         loginButton.addActionListener(e -> performLogin());
         loginPanel.add(loginButton, gbc);
         
-        // Users info panel
-        gbc.gridy = 5;
-        JPanel infoPanel = new JPanel();
-        infoPanel.setBackground(new Color(170, 200, 225));
-        infoPanel.setBorder(BorderFactory.createTitledBorder("Available Users"));
-        JTextArea infoArea = new JTextArea("Default Users:\n" +
-                                         "• morning_user : morning123\n" +
-                                         "• evening_user : evening123\n" +
-                                         "• admin : admin123");
-        infoArea.setEditable(false);
-        infoArea.setOpaque(false);
-        infoArea.setFont(new Font("Arial", Font.PLAIN, 12));
-        infoPanel.add(infoArea);
-        loginPanel.add(infoPanel, gbc);
+//        // Users info panel
+//        gbc.gridy = 5;
+//        JPanel infoPanel = new JPanel();
+//        infoPanel.setBackground(new Color(170, 200, 225));
+//        infoPanel.setBorder(BorderFactory.createTitledBorder("Available Users"));
+//        JTextArea infoArea = new JTextArea("Default Users:\n" +
+//                                         "• morning_user : morning123\n" +
+//                                         "• evening_user : evening123\n" +
+//                                         "• admin : admin123");
+//        infoArea.setEditable(false);
+//        infoArea.setOpaque(false);
+//        infoArea.setFont(new Font("Arial", Font.PLAIN, 12));
+//        infoPanel.add(infoArea);
+//        loginPanel.add(infoPanel, gbc);
         
         // Enter key support
         getRootPane().setDefaultButton(loginButton);
@@ -483,9 +478,11 @@ public class PharmacyGUI extends JFrame {
             // 4. Switch to next shift
             currentShift = nextShift;
             shiftStartTime = new Date();
+            updateEndShiftButtonText();
             
             // 5. Load new shift orders (will be empty for new shift)
-            loadCurrentShiftOrders();
+//            loadCurrentShiftOrders();
+            orders.clear();
             
             // 6. Save new shift state
             saveShiftState();
@@ -493,6 +490,10 @@ public class PharmacyGUI extends JFrame {
             
             // 7. Clear current cart if any
             currentCart.clear();
+            
+            // 8. Force logout and return to login screen
+            updateEndShiftButtonText(); // Add this line
+            performLogout();
             
             // Show success message
             JOptionPane.showMessageDialog(
@@ -592,8 +593,8 @@ public class PharmacyGUI extends JFrame {
         buttonPanel.setBackground(new Color(170, 200, 225));
         
         // End Shift Button
-        endShiftButton = new JButton("End " + currentShift.name().substring(0, 1) + 
-                                    currentShift.name().substring(1).toLowerCase() + " Shift");
+        endShiftButton = new JButton();
+        updateEndShiftButtonText(); // Set initial text
         endShiftButton.setBackground(new Color(255, 140, 0)); // Orange color
         endShiftButton.setForeground(Color.WHITE);
         endShiftButton.setFont(new Font("Arial", Font.BOLD, 12));
@@ -1008,7 +1009,7 @@ public class PharmacyGUI extends JFrame {
         orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         orderPanel.setBackground(new Color(170, 200, 225));
         // Order History Table
-        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status", "Products"}, 0) {
+        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status", "Sold By", "Products"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -1095,6 +1096,7 @@ public class PharmacyGUI extends JFrame {
             shiftStartTime = new Date();
             loadCurrentShiftOrders();
             saveShiftState();
+            updateEndShiftButtonText();
         }
         
         // Create login instance
@@ -1102,14 +1104,24 @@ public class PharmacyGUI extends JFrame {
         currentLogin.login(); // This will always return true since we checked credentials above
         
         updateHeaderLabel();
-        updateEndShiftButton();
+        updateEndShiftButtonText();
         showMainScreen();
     }
     
-    private void updateEndShiftButton() {
+//    private void updateEndShiftButton() {
+//        if (endShiftButton != null) {
+//            endShiftButton.setText("End " + currentShift.name().substring(0, 1) + 
+//                                  currentShift.name().substring(1).toLowerCase() + " Shift");
+//        }
+//    }
+//    private void updateEndShiftButton() {
+//        updateEndShiftButtonText();
+//    }
+    
+    private void updateEndShiftButtonText() {
         if (endShiftButton != null) {
-            endShiftButton.setText("End " + currentShift.name().substring(0, 1) + 
-                                  currentShift.name().substring(1).toLowerCase() + " Shift");
+            String shiftName = currentShift.getDisplayName();
+            endShiftButton.setText("End " + shiftName);
         }
     }
     
@@ -1321,7 +1333,7 @@ public class PharmacyGUI extends JFrame {
         
         try {
             // Create new order
-            Order order = new Order(customer);
+            Order order = new Order(customer, currentLogin.getUsername());
             
             // Add items to order and calculate total
             for (OrderItem item : currentCart) {
@@ -1491,6 +1503,7 @@ public class PharmacyGUI extends JFrame {
                 orderDate,
                 totalAmount,
                 status,
+                o.getSoldBy(),
                 products
             });
         }
