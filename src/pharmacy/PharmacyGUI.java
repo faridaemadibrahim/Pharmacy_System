@@ -288,16 +288,24 @@ public class PharmacyGUI extends JFrame {
     }
     
     private void initializeShiftData() {
-        // Load existing shift state or create new one
-        loadShiftState(); 
-        
-        // Load current shift orders
-        loadCurrentShiftOrders();
-        
-        System.out.println(currentShift.getDisplayName() + " initialized with " + 
-                         orders.size() + " orders");
+    File shiftStateFile = new File(SHIFT_STATE_FILE);
+    
+    if (shiftStateFile.exists()) {
+        // Load existing shift state
+        loadShiftState();
+    } else {
+        // Initialize with Morning shift as default
+        currentShift = ShiftType.MORNING;
+        shiftStartTime = new Date();
+        saveShiftState();
     }
     
+    // Load current shift orders
+    loadCurrentShiftOrders();
+    
+    System.out.println(currentShift.getDisplayName() + " initialized with " + 
+                     orders.size() + " orders");
+}
     private void initializeData() {
         // Initialize core data structures
         inventory = new Inventory();
@@ -359,168 +367,150 @@ public class PharmacyGUI extends JFrame {
     }
     
     private void createLoginPanel() {
-        loginPanel = new JPanel(new GridBagLayout());
-        loginPanel.setBackground(new Color(170, 200, 225));
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        
-        // Title with current shift indicator
-        ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
-        Image scaledImage = originalIcon.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
-        ImageIcon scaledIcon = new ImageIcon(scaledImage);
-        JLabel titleLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
-        titleLabel.setFont(new Font("Palatino Linotype", Font.BOLD, 40));
-        titleLabel.setForeground(new Color(50, 50, 225));
-        titleLabel.setHorizontalTextPosition(JLabel.CENTER);
-        titleLabel.setVerticalTextPosition(JLabel.BOTTOM);
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
-        loginPanel.add(titleLabel, gbc);
-        
-        // Current shift indicator on login screen
-        JLabel shiftIndicatorLabel = new JLabel("Current: " + currentShift.getDisplayName(), JLabel.CENTER);
-        shiftIndicatorLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        shiftIndicatorLabel.setForeground(new Color(50, 50, 225));
-        gbc.gridy = 1;
-        loginPanel.add(shiftIndicatorLabel, gbc);
-        
-        // Username
-        gbc.gridwidth = 1; gbc.gridy = 2;
-        JLabel usernameLabel = new JLabel("Username :");
-        usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        usernameLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/user1.png")));
-        loginPanel.add(usernameLabel, gbc);
-        gbc.gridx = 1;
-        usernameField = new JTextField(15);
-        loginPanel.add(usernameField, gbc);
-        
-        // Password
-        gbc.gridx = 0; gbc.gridy = 3;
-        JLabel passwordLabel = new JLabel("Password :");
-        passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        passwordLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/lock.png")));
-        loginPanel.add(passwordLabel, gbc);
-        gbc.gridx = 1;
-        passwordField = new JPasswordField(15);
-        loginPanel.add(passwordField, gbc);
-        
-        // Login Button
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
-        loginButton = new JButton("Login");
-        loginButton.setBackground(new Color(0, 0, 139));
-        loginButton.setForeground(Color.WHITE);
-        loginButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        loginButton.addActionListener(e -> performLogin());
-        loginPanel.add(loginButton, gbc);
-        
-//        // Users info panel
-//        gbc.gridy = 5;
-//        JPanel infoPanel = new JPanel();
-//        infoPanel.setBackground(new Color(170, 200, 225));
-//        infoPanel.setBorder(BorderFactory.createTitledBorder("Available Users"));
-//        JTextArea infoArea = new JTextArea("Default Users:\n" +
-//                                         "• morning_user : morning123\n" +
-//                                         "• evening_user : evening123\n" +
-//                                         "• admin : admin123");
-//        infoArea.setEditable(false);
-//        infoArea.setOpaque(false);
-//        infoArea.setFont(new Font("Arial", Font.PLAIN, 12));
-//        infoPanel.add(infoArea);
-//        loginPanel.add(infoPanel, gbc);
-        
-        // Enter key support
-        getRootPane().setDefaultButton(loginButton);
+    loginPanel = new JPanel(new GridBagLayout());
+    loginPanel.setBackground(new Color(170, 200, 225));
+    
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.insets = new Insets(10, 10, 10, 10);
+    
+    // Title
+    ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
+    Image scaledImage = originalIcon.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
+    ImageIcon scaledIcon = new ImageIcon(scaledImage);
+    JLabel titleLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
+    titleLabel.setFont(new Font("Palatino Linotype", Font.BOLD, 40));
+    titleLabel.setForeground(new Color(50, 50, 225));
+    titleLabel.setHorizontalTextPosition(JLabel.CENTER);
+    titleLabel.setVerticalTextPosition(JLabel.BOTTOM);
+    gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+    loginPanel.add(titleLabel, gbc);
+    
+    // Current shift indicator - always show the current shift
+    JLabel shiftIndicatorLabel = new JLabel("Current Shift: " + currentShift.getDisplayName(), JLabel.CENTER);
+    shiftIndicatorLabel.setFont(new Font("Arial", Font.BOLD, 18));
+    shiftIndicatorLabel.setForeground(new Color(50, 50, 225));
+    gbc.gridy = 1;
+    loginPanel.add(shiftIndicatorLabel, gbc);
+    
+    // Username
+    gbc.gridwidth = 1; gbc.gridy = 2;
+    JLabel usernameLabel = new JLabel("Username :");
+    usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+    usernameLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/user1.png")));
+    loginPanel.add(usernameLabel, gbc);
+    gbc.gridx = 1;
+    usernameField = new JTextField(15);
+    loginPanel.add(usernameField, gbc);
+    
+    // Password
+    gbc.gridx = 0; gbc.gridy = 3;
+    JLabel passwordLabel = new JLabel("Password :");
+    passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+    passwordLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/lock.png")));
+    loginPanel.add(passwordLabel, gbc);
+    gbc.gridx = 1;
+    passwordField = new JPasswordField(15);
+    loginPanel.add(passwordField, gbc);
+    
+    // Login Button
+    gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+    loginButton = new JButton("Login");
+    loginButton.setBackground(new Color(0, 0, 139));
+    loginButton.setForeground(Color.WHITE);
+    loginButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+    loginButton.addActionListener(e -> performLogin());
+    loginPanel.add(loginButton, gbc);
+    
+    // Enter key support
+    getRootPane().setDefaultButton(loginButton);
+}
+    private void endCurrentShift() {
+    // Determine the NEXT shift (opposite of current)
+    ShiftType nextShift = (currentShift == ShiftType.MORNING) ? ShiftType.EVENING : ShiftType.MORNING;
+    
+    // Show confirmation dialog
+    int choice = JOptionPane.showConfirmDialog(
+        this,
+        "Are you sure you want to end " + currentShift.getDisplayName() + "?\n\n" +
+        "This will:\n" +
+        "• Save current shift data\n" +
+        "• Switch to " + nextShift.getDisplayName() + "\n" +
+        "• Require re-login for the new shift\n" +
+        "• Clear current shift orders from display\n\n" +
+        "Current shift has " + orders.size() + " orders",
+        "End Shift Confirmation",
+        JOptionPane.YES_NO_OPTION,
+        JOptionPane.QUESTION_MESSAGE
+    );
+    
+    if (choice != JOptionPane.YES_OPTION) {
+        return;
     }
     
-    private void endCurrentShift() {
-        // Determine next shift
-        ShiftType nextShift = (currentShift == ShiftType.MORNING) ? ShiftType.EVENING : ShiftType.MORNING;
+    try {
+        // 1. Save current shift summary
+        saveShiftSummary();
         
-        // Show confirmation dialog
-        int choice = JOptionPane.showConfirmDialog(
+        // 2. Add current shift orders to all historical orders (if not already there)
+        for (Order order : orders) {
+            if (!allHistoricalOrders.contains(order)) {
+                allHistoricalOrders.add(order);
+            }
+        }
+        
+        // 3. Archive current shift orders file
+        String currentShiftFile = currentShift.getFileName() + "_shift_orders.txt";
+        String archivedShiftFile = "archived_" + currentShift.getFileName() + "_" + 
+                                 DATE_FORMAT.format(shiftStartTime).replace(":", "-").replace(" ", "_") + "_orders.txt";
+        File currentFile = new File(currentShiftFile);
+        if (currentFile.exists()) {
+            currentFile.renameTo(new File(archivedShiftFile));
+        }
+        
+        // 4. Switch to next shift - THIS IS THE KEY FIX
+        currentShift = nextShift;
+        shiftStartTime = new Date();
+        
+        // 5. Clear orders for new shift and load any existing orders for the new shift
+        orders.clear();
+        loadCurrentShiftOrders(); // Load orders for the new shift (if any)
+        
+        // 6. Save new shift state
+        saveShiftState();
+        saveCurrentShiftOrders();
+        
+        // 7. Clear current cart if any
+        currentCart.clear();
+        
+        // 8. Update UI to reflect new shift
+        updateHeaderLabel();
+        updateEndShiftButtonText();
+        
+        // 9. Show success message
+        JOptionPane.showMessageDialog(
             this,
-            "Are you sure you want to end " + currentShift.getDisplayName() + "?\n\n" +
-            "This will:\n" +
-            "• Save current shift data\n" +
-            "• Switch to " + nextShift.getDisplayName() + "\n" +
-            "• Require re-login for the new shift\n" +
-            "• Clear current shift orders from display\n\n" +
-            "Current shift has " + orders.size() + " orders",
-            "End Shift Confirmation",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE
+            "Shift switched successfully!\n\n" +
+            "Switched from " + ((nextShift == ShiftType.MORNING) ? "Evening" : "Morning") + " to " + nextShift.getDisplayName() + "\n" +
+            "Please log in again for the new shift",
+            "Shift Changed",
+            JOptionPane.INFORMATION_MESSAGE
         );
         
-        if (choice != JOptionPane.YES_OPTION) {
-            return;
-        }
+        // 10. Force logout and return to login screen
+        performLogout();
         
-        try {
-            // 1. Save current shift summary
-            saveShiftSummary();
-            
-            // 2. Add current shift orders to all historical orders (if not already there)
-            for (Order order : orders) {
-                if (!allHistoricalOrders.contains(order)) {
-                    allHistoricalOrders.add(order);
-                }
-            }
-            
-            // 3. Archive current shift orders file
-            String currentShiftFile = currentShift.getFileName() + "_shift_orders.txt";
-            String archivedShiftFile = "archived_" + currentShift.getFileName() + "_" + 
-                                     DATE_FORMAT.format(shiftStartTime).replace(":", "-").replace(" ", "_") + "_orders.txt";
-            File currentFile = new File(currentShiftFile);
-            if (currentFile.exists()) {
-                currentFile.renameTo(new File(archivedShiftFile));
-            }
-            
-            // 4. Switch to next shift
-            currentShift = nextShift;
-            shiftStartTime = new Date();
-            updateEndShiftButtonText();
-            
-            // 5. Load new shift orders (will be empty for new shift)
-//            loadCurrentShiftOrders();
-            orders.clear();
-            
-            // 6. Save new shift state
-            saveShiftState();
-            saveCurrentShiftOrders();
-            
-            // 7. Clear current cart if any
-            currentCart.clear();
-            
-            // 8. Force logout and return to login screen
-            updateEndShiftButtonText(); // Add this line
-            performLogout();
-            
-            // Show success message
-            JOptionPane.showMessageDialog(
-                this,
-                "Shift ended successfully!\n\n" +
-                "Switched to " + currentShift.getDisplayName() + "\n" +
-                "Please log in again for the new shift",
-                "Shift Changed",
-                JOptionPane.INFORMATION_MESSAGE
-            );
-            
-            // 8. Force logout and return to login screen
-            performLogout();
-            
-            System.out.println(currentShift.getDisplayName() + " started at: " + shiftStartTime);
-            
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(
-                this,
-                "Error ending shift: " + e.getMessage(),
-                "Shift Error",
-                JOptionPane.ERROR_MESSAGE
-            );
-            e.printStackTrace();
-        }
+        System.out.println("Switched to " + currentShift.getDisplayName() + " at: " + shiftStartTime);
+        
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(
+            this,
+            "Error switching shift: " + e.getMessage(),
+            "Shift Error",
+            JOptionPane.ERROR_MESSAGE
+        );
+        e.printStackTrace();
     }
-    
+}
     // Add method to save shift summary:
     private void saveShiftSummary() {
         try {
@@ -1073,41 +1063,44 @@ public class PharmacyGUI extends JFrame {
     
     // ===================== Event Handlers =====================
     private void performLogin() {
-        String username = usernameField.getText().trim();
-        String password = new String(((JPasswordField) passwordField).getPassword());
-        
-        if (username.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter both username and password!", "Login Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Check credentials against loaded users
-        if (!userCredentials.containsKey(username) || !userCredentials.get(username).equals(password)) {
-            JOptionPane.showMessageDialog(this, "Invalid username or password!", "Login Failed", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Determine shift based on username
-        ShiftType loginShift = determineShiftFromUsername(username);
-        
-        // Update current shift if different from login
-        if (currentShift != loginShift) {
-            currentShift = loginShift;
-            shiftStartTime = new Date();
-            loadCurrentShiftOrders();
-            saveShiftState();
-            updateEndShiftButtonText();
-        }
-        
-        // Create login instance
-        currentLogin = new Login(username, password);
-        currentLogin.login(); // This will always return true since we checked credentials above
-        
-        updateHeaderLabel();
-        updateEndShiftButtonText();
-        showMainScreen();
+    String username = usernameField.getText().trim();
+    String password = new String(((JPasswordField) passwordField).getPassword());
+    
+    if (username.isEmpty() || password.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Please enter both username and password!", "Login Error", JOptionPane.ERROR_MESSAGE);
+        return;
     }
     
+    // Check credentials against loaded users
+    if (!userCredentials.containsKey(username) || !userCredentials.get(username).equals(password)) {
+        JOptionPane.showMessageDialog(this, "Invalid username or password!", "Login Failed", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Load existing shift state or initialize default (Morning)
+    File shiftStateFile = new File(SHIFT_STATE_FILE);
+    if (shiftStateFile.exists()) {
+        // Load existing shift state - DON'T change it based on username
+        loadShiftState();
+        loadCurrentShiftOrders();
+        System.out.println("Loaded existing " + currentShift.getDisplayName() + " started at " + shiftStartTime);
+    } else {
+        // If no shift state exists, start with Morning shift
+        currentShift = ShiftType.MORNING;
+        shiftStartTime = new Date();
+        orders = new ArrayList<>();
+        saveShiftState();
+        System.out.println("Started new " + currentShift.getDisplayName() + " at " + shiftStartTime);
+    }
+    
+    // Create login instance
+    currentLogin = new Login(username, password);
+    currentLogin.login();
+    
+    updateHeaderLabel();
+    updateEndShiftButtonText();
+    showMainScreen();
+}
 //    private void updateEndShiftButton() {
 //        if (endShiftButton != null) {
 //            endShiftButton.setText("End " + currentShift.name().substring(0, 1) + 
@@ -1138,17 +1131,16 @@ public class PharmacyGUI extends JFrame {
     }
     
     private void showLoginScreen() {
-        getContentPane().removeAll();
-        // Update login panel to show current shift
-        createLoginPanel();
-        add(loginPanel, BorderLayout.CENTER);
-        usernameField.setText("");
-        passwordField.setText("");
-        usernameField.requestFocus();
-        revalidate();
-        repaint();
-    }
-    
+    getContentPane().removeAll();
+    // Update login panel to show current shift
+    createLoginPanel();
+    add(loginPanel, BorderLayout.CENTER);
+    usernameField.setText("");
+    passwordField.setText("");
+    usernameField.requestFocus();
+    revalidate();
+    repaint();
+}
     private void showMainScreen() {
         getContentPane().removeAll();
         add(mainPanel, BorderLayout.CENTER);

@@ -220,3 +220,44 @@ Orders in this shift:
   - Order #18 | Customer: Farida | Total: $15.50
 =====================================
 
+=== EVENING SHIFT SUMMARY ===
+Start Time: Fri Aug 22 00:48:05 EEST 2025
+End Time: Fri Aug 22 00:59:19 EEST 2025
+Total Orders: 0
+Total Items Sold: 0
+Total Revenue: $0.00
+Cashier: Farida
+Orders in this shift:
+=====================================
+
+=== EVENING SHIFT SUMMARY ===
+Start Time: Fri Aug 22 00:59:33 EEST 2025
+End Time: Fri Aug 22 01:10:29 EEST 2025
+Total Orders: 0
+Total Items Sold: 0
+Total Revenue: $0.00
+Cashier: Farida
+Orders in this shift:
+=====================================
+
+=== MORNING SHIFT SUMMARY ===
+Start Time: Fri Aug 22 01:10:29 EEST 2025
+End Time: Fri Aug 22 01:10:50 EEST 2025
+Total Orders: 0
+Total Items Sold: 0
+Total Revenue: $0.00
+Cashier: Farida
+Orders in this shift:
+=====================================
+
+=== EVENING SHIFT SUMMARY ===
+Start Time: Fri Aug 22 01:10:50 EEST 2025
+End Time: Fri Aug 22 01:12:15 EEST 2025
+Total Orders: 1
+Total Items Sold: 1
+Total Revenue: $400.00
+Cashier: Ammar
+Orders in this shift:
+  - Order #19 | Customer: Farida | Total: $400.00
+=====================================
+
