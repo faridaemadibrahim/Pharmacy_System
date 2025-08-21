@@ -1111,8 +1111,11 @@ public class PharmacyGUI extends JFrame {
             String totalAmount = String.format("$%.2f", o.getTotalAmount());
             String status = (o.getStatus() != null) ? o.getStatus() : "Pending";
 
-            // Load order items and create product summary
-            o.loadOrderItems(inventory.getProducts());
+            // Only load order items if not already loaded (check if items list is empty)
+            if (o.getItems().isEmpty()) {
+                o.loadOrderItems(inventory.getProducts());
+            }
+
             StringBuilder productSummary = new StringBuilder();
             for (OrderItem item : o.getItems()) {
                 if (productSummary.length() > 0) productSummary.append(", ");
