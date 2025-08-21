@@ -9,14 +9,33 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 
 /**
- * Enhanced Pharmacy Management System GUI with Persistent Shift State
+ * Enhanced Pharmacy Management System GUI with Morning/Evening Shift Management
  * @author PharmacySystem
  */
 public class PharmacyGUI extends JFrame {
+    
+    // Shift Types
+    public enum ShiftType {
+        MORNING("Morning Shift", "morning"),
+        EVENING("Evening Shift", "evening");
+        
+        private final String displayName;
+        private final String fileName;
+        
+        ShiftType(String displayName, String fileName) {
+            this.displayName = displayName;
+            this.fileName = fileName;
+        }
+        
+        public String getDisplayName() { return displayName; }
+        public String getFileName() { return fileName; }
+    }
     
     // Core components
     private Login currentLogin;
@@ -31,11 +50,14 @@ public class PharmacyGUI extends JFrame {
     private JTextField usernameField, passwordField;
     private JButton loginButton, logoutButton;
     private JButton endShiftButton;
+    private JLabel headerLabel; // Make it a field for dynamic updates
     
     // Shift management
-    private int currentShiftNumber = 1;
-    private List<Order> allHistoricalOrders; // Keeps all orders ever made
+    private ShiftType currentShift = ShiftType.MORNING;
+    private List<Order> allHistoricalOrders;
     private Date shiftStartTime;
+    private Map<String, String> userCredentials; // username -> password
+    private static final String USERS_FILE = "users.txt";
     private static final String SHIFT_STATE_FILE = "current_shift.txt";
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     
@@ -67,13 +89,98 @@ public class PharmacyGUI extends JFrame {
     private DefaultTableModel orderHistoryModel;
     
     public PharmacyGUI() {
+        initializeUserCredentials();
         initializeData();
         initializeGUI();
         showLoginScreen();
     }
     
     /**
-     * Load current shift state from file when application starts
+     * Initialize user credentials from file
+     */
+    private void initializeUserCredentials() {
+        userCredentials = new HashMap<>();
+        
+        // Load users from file
+        loadUsersFromFile();
+        
+        // If no users exist, create default users
+        if (userCredentials.isEmpty()) {
+            createDefaultUsers();
+            saveUsersToFile();
+        }
+    }
+    
+    /**
+     * Load users from users.txt file
+     */
+    private void loadUsersFromFile() {
+        File usersFile = new File(USERS_FILE);
+        if (usersFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(usersFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue; // Skip empty lines and comments
+                    
+                    String[] parts = line.split("=", 2);
+                    if (parts.length == 2) {
+                        userCredentials.put(parts[0].trim(), parts[1].trim());
+                    }
+                }
+                System.out.println("Loaded " + userCredentials.size() + " users from file");
+            } catch (IOException e) {
+                System.err.println("Error loading users from file: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Create default users
+     */
+    private void createDefaultUsers() {
+        userCredentials.put("morning_user", "morning123");
+        userCredentials.put("evening_user", "evening123");
+        userCredentials.put("admin", "admin123");
+        System.out.println("Created default users");
+    }
+    
+    /**
+     * Save users to file
+     */
+    private void saveUsersToFile() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(USERS_FILE))) {
+            writer.println("# Pharmacy Management System Users");
+            writer.println("# Format: username=password");
+            writer.println();
+            
+            for (Map.Entry<String, String> entry : userCredentials.entrySet()) {
+                writer.println(entry.getKey() + "=" + entry.getValue());
+            }
+            
+            System.out.println("Saved " + userCredentials.size() + " users to file");
+        } catch (IOException e) {
+            System.err.println("Error saving users to file: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Determine shift type based on username
+     */
+    private ShiftType determineShiftFromUsername(String username) {
+        if (username.toLowerCase().contains("evening")) {
+            return ShiftType.EVENING;
+        } else if (username.toLowerCase().contains("morning")) {
+            return ShiftType.MORNING;
+        } else {
+            // For admin or other users, determine based on current time
+            int hour = new Date().getHours();
+            return (hour >= 6 && hour < 18) ? ShiftType.MORNING : ShiftType.EVENING;
+        }
+    }
+    
+    /**
+     * Load current shift state from file
      */
     private void loadShiftState() {
         File shiftFile = new File(SHIFT_STATE_FILE);
@@ -82,21 +189,27 @@ public class PharmacyGUI extends JFrame {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
-                    if (line.startsWith("SHIFT_NUMBER=")) {
-                        currentShiftNumber = Integer.parseInt(line.substring("SHIFT_NUMBER=".length()));
+                    if (line.startsWith("SHIFT_TYPE=")) {
+                        String shiftTypeStr = line.substring("SHIFT_TYPE=".length());
+                        try {
+                            currentShift = ShiftType.valueOf(shiftTypeStr);
+                        } catch (IllegalArgumentException e) {
+                            System.err.println("Invalid shift type in file: " + shiftTypeStr);
+                            currentShift = ShiftType.MORNING;
+                        }
                     } else if (line.startsWith("SHIFT_START_TIME=")) {
                         String timeStr = line.substring("SHIFT_START_TIME=".length());
                         try {
                             shiftStartTime = DATE_FORMAT.parse(timeStr);
                         } catch (ParseException e) {
                             System.err.println("Error parsing shift start time: " + e.getMessage());
-                            shiftStartTime = new Date(); // Default to current time
+                            shiftStartTime = new Date();
                         }
                     }
                 }
-                System.out.println("Loaded existing shift state: Shift " + currentShiftNumber + 
+                System.out.println("Loaded existing shift state: " + currentShift.getDisplayName() + 
                                  ", Started: " + shiftStartTime);
-            } catch (IOException | NumberFormatException e) {
+            } catch (IOException e) {
                 System.err.println("Error loading shift state: " + e.getMessage());
                 initializeNewShift();
             }
@@ -110,9 +223,9 @@ public class PharmacyGUI extends JFrame {
      */
     private void saveShiftState() {
         try (PrintWriter writer = new PrintWriter(new FileWriter(SHIFT_STATE_FILE))) {
-            writer.println("SHIFT_NUMBER=" + currentShiftNumber);
+            writer.println("SHIFT_TYPE=" + currentShift.name());
             writer.println("SHIFT_START_TIME=" + DATE_FORMAT.format(shiftStartTime));
-            System.out.println("Saved shift state: Shift " + currentShiftNumber);
+            System.out.println("Saved shift state: " + currentShift.getDisplayName());
         } catch (IOException e) {
             System.err.println("Error saving shift state: " + e.getMessage());
         }
@@ -122,13 +235,13 @@ public class PharmacyGUI extends JFrame {
      * Initialize a new shift
      */
     private void initializeNewShift() {
-        currentShiftNumber = 1;
+        currentShift = ShiftType.MORNING;
         shiftStartTime = new Date();
         saveShiftState();
     }
     
     /**
-     * Load current shift orders (orders made in the current shift)
+     * Load current shift orders
      */
     private void loadCurrentShiftOrders() {
         // Load all orders from file
@@ -136,7 +249,7 @@ public class PharmacyGUI extends JFrame {
         allHistoricalOrders = new ArrayList<>(allOrders);
         
         // Filter orders for current shift by loading shift-specific order file
-        String shiftOrdersFile = "shift_" + currentShiftNumber + "_orders.txt";
+        String shiftOrdersFile = currentShift.getFileName() + "_shift_orders.txt";
         File file = new File(shiftOrdersFile);
         
         orders = new ArrayList<>();
@@ -157,7 +270,7 @@ public class PharmacyGUI extends JFrame {
                         }
                     }
                 }
-                System.out.println("Loaded " + orders.size() + " orders for current shift " + currentShiftNumber);
+                System.out.println("Loaded " + orders.size() + " orders for " + currentShift.getDisplayName());
             } catch (IOException | NumberFormatException e) {
                 System.err.println("Error loading current shift orders: " + e.getMessage());
             }
@@ -168,12 +281,12 @@ public class PharmacyGUI extends JFrame {
      * Save current shift orders to shift-specific file
      */
     private void saveCurrentShiftOrders() {
-        String shiftOrdersFile = "shift_" + currentShiftNumber + "_orders.txt";
+        String shiftOrdersFile = currentShift.getFileName() + "_shift_orders.txt";
         try (PrintWriter writer = new PrintWriter(new FileWriter(shiftOrdersFile))) {
             for (Order order : orders) {
                 writer.println("ORDER_ID=" + order.getOrderId());
             }
-            System.out.println("Saved " + orders.size() + " orders for  current shift " + currentShiftNumber);
+            System.out.println("Saved " + orders.size() + " orders for " + currentShift.getDisplayName());
         } catch (IOException e) {
             System.err.println("Error saving current shift orders: " + e.getMessage());
         }
@@ -186,7 +299,7 @@ public class PharmacyGUI extends JFrame {
         // Load current shift orders
         loadCurrentShiftOrders();
         
-        System.out.println("Current Shift " + currentShiftNumber + " initialized with " + 
+        System.out.println(currentShift.getDisplayName() + " initialized with " + 
                          orders.size() + " orders");
     }
     
@@ -257,7 +370,7 @@ public class PharmacyGUI extends JFrame {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         
-        // Title
+        // Title with current shift indicator
         ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
         Image scaledImage = originalIcon.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
         ImageIcon scaledIcon = new ImageIcon(scaledImage);
@@ -269,8 +382,15 @@ public class PharmacyGUI extends JFrame {
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
         loginPanel.add(titleLabel, gbc);
         
+        // Current shift indicator on login screen
+        JLabel shiftIndicatorLabel = new JLabel("Current: " + currentShift.getDisplayName(), JLabel.CENTER);
+        shiftIndicatorLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        shiftIndicatorLabel.setForeground(new Color(50, 50, 225));
+        gbc.gridy = 1;
+        loginPanel.add(shiftIndicatorLabel, gbc);
+        
         // Username
-        gbc.gridwidth = 1; gbc.gridy = 1;
+        gbc.gridwidth = 1; gbc.gridy = 2;
         JLabel usernameLabel = new JLabel("Username :");
         usernameLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         usernameLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/user1.png")));
@@ -280,7 +400,7 @@ public class PharmacyGUI extends JFrame {
         loginPanel.add(usernameField, gbc);
         
         // Password
-        gbc.gridx = 0; gbc.gridy = 2;
+        gbc.gridx = 0; gbc.gridy = 3;
         JLabel passwordLabel = new JLabel("Password :");
         passwordLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         passwordLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Pharmacy/lock.png")));
@@ -290,7 +410,7 @@ public class PharmacyGUI extends JFrame {
         loginPanel.add(passwordField, gbc);
         
         // Login Button
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         loginButton = new JButton("Login");
         loginButton.setBackground(new Color(0, 0, 139));
         loginButton.setForeground(Color.WHITE);
@@ -298,19 +418,38 @@ public class PharmacyGUI extends JFrame {
         loginButton.addActionListener(e -> performLogin());
         loginPanel.add(loginButton, gbc);
         
+        // Users info panel
+        gbc.gridy = 5;
+        JPanel infoPanel = new JPanel();
+        infoPanel.setBackground(new Color(170, 200, 225));
+        infoPanel.setBorder(BorderFactory.createTitledBorder("Available Users"));
+        JTextArea infoArea = new JTextArea("Default Users:\n" +
+                                         "• morning_user : morning123\n" +
+                                         "• evening_user : evening123\n" +
+                                         "• admin : admin123");
+        infoArea.setEditable(false);
+        infoArea.setOpaque(false);
+        infoArea.setFont(new Font("Arial", Font.PLAIN, 12));
+        infoPanel.add(infoArea);
+        loginPanel.add(infoPanel, gbc);
+        
         // Enter key support
         getRootPane().setDefaultButton(loginButton);
     }
     
     private void endCurrentShift() {
+        // Determine next shift
+        ShiftType nextShift = (currentShift == ShiftType.MORNING) ? ShiftType.EVENING : ShiftType.MORNING;
+        
         // Show confirmation dialog
         int choice = JOptionPane.showConfirmDialog(
             this,
-            "Are you sure you want to end Shift " + currentShiftNumber + "?\n\n" +
+            "Are you sure you want to end " + currentShift.getDisplayName() + "?\n\n" +
             "This will:\n" +
-            "• Clear current shift orders from display\n" +
-            "• Start a new shift\n" +
-            "• All orders remain saved in pharmacy records\n\n" +
+            "• Save current shift data\n" +
+            "• Switch to " + nextShift.getDisplayName() + "\n" +
+            "• Require re-login for the new shift\n" +
+            "• Clear current shift orders from display\n\n" +
             "Current shift has " + orders.size() + " orders",
             "End Shift Confirmation",
             JOptionPane.YES_NO_OPTION,
@@ -322,7 +461,7 @@ public class PharmacyGUI extends JFrame {
         }
         
         try {
-            // 1. Save current shift summary to a special file
+            // 1. Save current shift summary
             saveShiftSummary();
             
             // 2. Add current shift orders to all historical orders (if not already there)
@@ -333,46 +472,42 @@ public class PharmacyGUI extends JFrame {
             }
             
             // 3. Archive current shift orders file
-            String currentShiftFile = "shift_" + currentShiftNumber + "_orders.txt";
-            String archivedShiftFile = "archived_shift_" + currentShiftNumber + "_orders.txt";
+            String currentShiftFile = currentShift.getFileName() + "_shift_orders.txt";
+            String archivedShiftFile = "archived_" + currentShift.getFileName() + "_" + 
+                                     DATE_FORMAT.format(shiftStartTime).replace(":", "-").replace(" ", "_") + "_orders.txt";
             File currentFile = new File(currentShiftFile);
             if (currentFile.exists()) {
                 currentFile.renameTo(new File(archivedShiftFile));
             }
             
-            // 4. Clear current shift orders
-            orders.clear();
-            
-            // 5. Increment shift number and reset shift start time
-            currentShiftNumber++;
+            // 4. Switch to next shift
+            currentShift = nextShift;
             shiftStartTime = new Date();
+            
+            // 5. Load new shift orders (will be empty for new shift)
+            loadCurrentShiftOrders();
             
             // 6. Save new shift state
             saveShiftState();
-            saveCurrentShiftOrders(); // This will create empty shift file
+            saveCurrentShiftOrders();
             
-            // 7. Update header to show new shift number
-            updateShiftHeader();
-            
-            // 8. Refresh all displays
-            refreshAllTables();
-            refreshDashboard();
-            
-            // 9. Clear current cart if any
+            // 7. Clear current cart if any
             currentCart.clear();
-            refreshCartTable();
             
             // Show success message
             JOptionPane.showMessageDialog(
                 this,
                 "Shift ended successfully!\n\n" +
-                "Started new Shift \n" +
-                "All previous orders remain in pharmacy records",
-                "Shift Ended",
+                "Switched to " + currentShift.getDisplayName() + "\n" +
+                "Please log in again for the new shift",
+                "Shift Changed",
                 JOptionPane.INFORMATION_MESSAGE
             );
             
-            System.out.println("Shift " + currentShiftNumber + " started at: " + shiftStartTime);
+            // 8. Force logout and return to login screen
+            performLogout();
+            
+            System.out.println(currentShift.getDisplayName() + " started at: " + shiftStartTime);
             
         } catch (Exception e) {
             JOptionPane.showMessageDialog(
@@ -402,7 +537,7 @@ public class PharmacyGUI extends JFrame {
             }
             
             // Write shift summary
-            printWriter.println("=== SHIFT " + currentShiftNumber + " SUMMARY ===");
+            printWriter.println("=== " + currentShift.getDisplayName().toUpperCase() + " SUMMARY ===");
             printWriter.println("Start Time: " + shiftStartTime);
             printWriter.println("End Time: " + new Date());
             printWriter.println("Total Orders: " + orders.size());
@@ -428,61 +563,11 @@ public class PharmacyGUI extends JFrame {
         }
     }
     
-    // Add method to update header with new shift number:
-    private void updateShiftHeader() {
-        // Find the header label and update it
-        Component[] components = ((JPanel) mainPanel.getComponent(0)).getComponents(); // Get header panel components
-        for (Component comp : components) {
-            if (comp instanceof JLabel) {
-                JLabel headerLabel = (JLabel) comp;
-                String currentText = headerLabel.getText();
-                if (currentText.contains("Shift")) {
-                    headerLabel.setText("Pharmacy Management System" );
-                    break;
-                }
-            }
+    // Update header with shift information
+    private void updateHeaderLabel() {
+        if (headerLabel != null) {
+            headerLabel.setText("Pharmacy Management System - " + currentShift.getDisplayName());
         }
-        
-        // Refresh the display
-        mainPanel.revalidate();
-        mainPanel.repaint();
-    }
-    
-    // Add method to view all historical orders (optional - you can add this as a menu item):
-    private void showAllHistoricalOrders() {
-        JFrame historyFrame = new JFrame("Complete Order History - All Shifts");
-        historyFrame.setSize(800, 600);
-        historyFrame.setLocationRelativeTo(this);
-        
-        DefaultTableModel allOrdersModel = new DefaultTableModel(
-            new String[]{"Order ID", "Customer", "Date", "Total", "Shift", "Status"}, 0
-        ) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        
-        JTable allOrdersTable = new JTable(allOrdersModel);
-        allOrdersTable.setBackground(new Color(200, 220, 255));
-        allOrdersTable.setForeground(Color.BLACK);
-        allOrdersTable.setGridColor(new Color(120, 150, 200));
-        
-        // Populate with all historical orders
-        for (Order order : allHistoricalOrders) {
-            allOrdersModel.addRow(new Object[]{
-                order.getOrderId(),
-                order.getCustomer().getName(),
-                order.getOrderDate(),
-                String.format("$%.2f", order.getTotalAmount()),
-                "Previous", // You could track which shift each order was from
-                order.getStatus()
-            });
-        }
-        
-        JScrollPane scrollPane = new JScrollPane(allOrdersTable);
-        historyFrame.add(scrollPane);
-        historyFrame.setVisible(true);
     }
     
    private void createMainPanel() {
@@ -493,11 +578,12 @@ public class PharmacyGUI extends JFrame {
         headerPanel.setBackground(new Color(170, 200, 225));
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         
-        // Left side - Logo and title
+        // Left side - Logo and title with shift info
         ImageIcon originalIcon = new ImageIcon(getClass().getResource("/Pharmacy/f1.png"));
         Image scaledImage = originalIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
         ImageIcon scaledIcon = new ImageIcon(scaledImage);
-        JLabel headerLabel = new JLabel("Pharmacy Management System", scaledIcon, JLabel.CENTER);
+        headerLabel = new JLabel("Pharmacy Management System - " + currentShift.getDisplayName(), 
+                                scaledIcon, JLabel.CENTER);
         headerLabel.setFont(new Font("Lucida Sans", Font.BOLD, 20));
         headerLabel.setForeground(new Color(50, 50, 225));
         
@@ -506,7 +592,8 @@ public class PharmacyGUI extends JFrame {
         buttonPanel.setBackground(new Color(170, 200, 225));
         
         // End Shift Button
-        endShiftButton = new JButton("End Shift");
+        endShiftButton = new JButton("End " + currentShift.name().substring(0, 1) + 
+                                    currentShift.name().substring(1).toLowerCase() + " Shift");
         endShiftButton.setBackground(new Color(255, 140, 0)); // Orange color
         endShiftButton.setForeground(Color.WHITE);
         endShiftButton.setFont(new Font("Arial", Font.BOLD, 12));
@@ -554,7 +641,7 @@ public class PharmacyGUI extends JFrame {
             new Color(46, 204, 113), 
             totalCustomersLabel = new JLabel()));
             
-        dashboard.add(createStatCardWithReference("Orders Today", 
+        dashboard.add(createStatCardWithReference("Orders This Shift", 
             String.valueOf(orders.size()), 
             new Color(155, 89, 182), 
             ordersTodayLabel = new JLabel()));
@@ -946,7 +1033,7 @@ public class PharmacyGUI extends JFrame {
         });
         JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
         orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
-        orderScrollPane.setBorder(new TitledBorder("Order History (Double-click for details)"));
+        orderScrollPane.setBorder(new TitledBorder("Order History - " + currentShift.getDisplayName() + " (Double-click for details)"));
         orderPanel.add(orderScrollPane, BorderLayout.CENTER);
         refreshOrderHistoryTable();
         return orderPanel;
@@ -961,7 +1048,8 @@ public class PharmacyGUI extends JFrame {
             details.append("Customer: ").append(order.getCustomer().getName()).append("\n");
             details.append("Phone: ").append(order.getCustomer().getPhone()).append("\n");
             details.append("Date: ").append(order.getOrderDate()).append("\n");
-            details.append("Status: ").append(order.getStatus()).append("\n\n");
+            details.append("Status: ").append(order.getStatus()).append("\n");
+            details.append("Shift: ").append(currentShift.getDisplayName()).append("\n\n");
             details.append("Products:\n");
             details.append("----------------------------------------\n");
             for (OrderItem item : order.getItems()) {
@@ -992,11 +1080,36 @@ public class PharmacyGUI extends JFrame {
             return;
         }
         
-        currentLogin = new Login(username, password);
-        if (currentLogin.login()) {
-            showMainScreen();
-        } else {
+        // Check credentials against loaded users
+        if (!userCredentials.containsKey(username) || !userCredentials.get(username).equals(password)) {
             JOptionPane.showMessageDialog(this, "Invalid username or password!", "Login Failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // Determine shift based on username
+        ShiftType loginShift = determineShiftFromUsername(username);
+        
+        // Update current shift if different from login
+        if (currentShift != loginShift) {
+            currentShift = loginShift;
+            shiftStartTime = new Date();
+            loadCurrentShiftOrders();
+            saveShiftState();
+        }
+        
+        // Create login instance
+        currentLogin = new Login(username, password);
+        currentLogin.login(); // This will always return true since we checked credentials above
+        
+        updateHeaderLabel();
+        updateEndShiftButton();
+        showMainScreen();
+    }
+    
+    private void updateEndShiftButton() {
+        if (endShiftButton != null) {
+            endShiftButton.setText("End " + currentShift.name().substring(0, 1) + 
+                                  currentShift.name().substring(1).toLowerCase() + " Shift");
         }
     }
     
@@ -1014,6 +1127,8 @@ public class PharmacyGUI extends JFrame {
     
     private void showLoginScreen() {
         getContentPane().removeAll();
+        // Update login panel to show current shift
+        createLoginPanel();
         add(loginPanel, BorderLayout.CENTER);
         usernameField.setText("");
         passwordField.setText("");
@@ -1243,8 +1358,8 @@ public class PharmacyGUI extends JFrame {
             
             // Show success message
             JOptionPane.showMessageDialog(this, 
-                String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nSaved to files & current shift", 
-                             order.getOrderId(), order.getTotalAmount()), 
+                String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nShift: %s\nSaved to files & current shift", 
+                             order.getOrderId(), order.getTotalAmount(), currentShift.getDisplayName()), 
                 "Success", JOptionPane.INFORMATION_MESSAGE);
                 
         } catch (Exception e) {
@@ -1262,7 +1377,7 @@ public class PharmacyGUI extends JFrame {
             totalCustomersLabel.setText(String.valueOf(customers.size()));
         }
         if (ordersTodayLabel != null) {
-           ordersTodayLabel.setText(String.valueOf(orders.size()) + " (This Shift)");
+           ordersTodayLabel.setText(String.valueOf(orders.size()));
         }
         if (lowStockLabel != null) {
             lowStockLabel.setText(String.valueOf(getLowStockCount()));
