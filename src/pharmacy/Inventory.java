@@ -95,7 +95,7 @@ public class Inventory {
     
     // for files
     
-    private void saveToFile() {
+    public void saveToFile() {
         try(BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_NAME))) {
             for (Product p: products) {
                 writer.write(p.getProductId() + "," + p.getName() + "," + p.getPrice() + "," + p.getQuantity());
@@ -105,7 +105,7 @@ public class Inventory {
             System.out.println("[ERR], Failedto save Inventory: " + e.getMessage());
         }
     }
-    private void loadFromFile() {
+    public void loadFromFile() {
     File file = new File(FILE_NAME);
     if (!file.exists()) {
         return; // لو الملف مش موجود نخرج من الفانكشن

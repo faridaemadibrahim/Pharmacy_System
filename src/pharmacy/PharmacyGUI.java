@@ -67,14 +67,14 @@ public class PharmacyGUI extends JFrame {
         // Initialize core data structures
         inventory = new Inventory();
         currentCart = new ArrayList<>();
-        
+
         // Load existing customers from file
         Customer.initializeLastId("customers.txt");
         customers = Customer.loadCustomersFromFile("customers.txt");
-        
+
         // Load existing orders from file
         orders = Order.loadOrdersFromFile(customers);
-        
+
         // Add some sample data if files are empty
         if (customers.isEmpty()) {
             customers.add(new Customer("Farida", "01012345678"));
@@ -85,13 +85,16 @@ public class PharmacyGUI extends JFrame {
                 c.saveToFile("customers.txt");
             }
         }
-        
-        // Initialize sample inventory if empty
+
+        // Only initialize sample inventory if completely empty AND no file exists
         if (inventory.getProducts().isEmpty()) {
-            inventory.addProduct(new Medicine(false, 1, "Panadol", 15.50, 100));
-            inventory.addProduct(new Medicine(true, 2, "Insulin", 120.00, 25));
-            inventory.addProduct(new Cosmetic("Normal", 3, "Face Cream", 45.00, 30));
-            inventory.addProduct(new Medicine(false, 4, "Aspirin", 12.00, 75));
+            File inventoryFile = new File("inventory.txt");
+            if (!inventoryFile.exists()) {
+                inventory.addProduct(new Medicine(false, 1, "Panadol", 15.50, 100));
+                inventory.addProduct(new Medicine(true, 2, "Insulin", 120.00, 25));
+                inventory.addProduct(new Cosmetic("Normal", 3, "Face Cream", 45.00, 30));
+                inventory.addProduct(new Medicine(false, 4, "Aspirin", 12.00, 75));
+            }
         }
     }
     
@@ -256,53 +259,81 @@ public class PharmacyGUI extends JFrame {
     }
     
     private JPanel createProductPanel() {
-    JPanel productPanel = new JPanel(new BorderLayout(10, 10));
-    productPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-    
-    productPanel.setBackground(new Color(170, 200, 225));
-    
-    // Product Table
-    productTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Type", "Price", "Quantity", "Special"}, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-    };
-    productTable = new JTable(productTableModel);
-    productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    // Product Table
-productTable = new JTable(productTableModel);
+        JPanel productPanel = new JPanel(new BorderLayout(10, 10));
+        productPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        productPanel.setBackground(new Color(170, 200, 225));
+                
+        // Search Panel
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBackground(new Color(170, 200, 225));
+        searchPanel.add(new JLabel("Search Products:"));
+        JTextField productSearchField = new JTextField(20);
+        searchPanel.add(productSearchField);
 
-// ألوان الجدول نفسه
-productTable.setBackground(new Color(200, 220, 255));  // خلفية الصفوف
-productTable.setForeground(Color.BLACK);               // لون الخط
-productTable.setGridColor(new Color(120, 150, 200));   // لون الخطوط بين الخلايا
+        // Product Table
+        productTableModel = new DefaultTableModel(new String[]{"ID", "Name", "Type", "Price", "Quantity", "Special"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        productTable = new JTable(productTableModel);
+        productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        productTable.setBackground(new Color(200, 220, 255));
+        productTable.setForeground(Color.BLACK);
+        productTable.setGridColor(new Color(120, 150, 200));
+        productTable.getTableHeader().setBackground(new Color(70, 130, 180));
+        productTable.getTableHeader().setForeground(Color.BLACK);
 
-// ألوان الهيدر
-productTable.getTableHeader().setBackground(new Color(70, 130, 180));
-productTable.getTableHeader().setForeground(Color.BLACK);
+        JScrollPane productScrollPane = new JScrollPane(productTable);
+        productScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+        productScrollPane.setBorder(BorderFactory.createTitledBorder("Product Inventory"));
 
-// ScrollPane
-JScrollPane productScrollPane = new JScrollPane(productTable);
-productScrollPane.getViewport().setBackground(new Color(200, 220, 255)); // الخلفية بعد آخر صف
+        refreshProductTable();
 
-// Panel خاص بالبرودكت
-productPanel.setBackground(new Color(180, 200, 240)); // خلفية البانيل ككل
-productPanel.setBorder(BorderFactory.createTitledBorder("Product Inventory"));
+        // Add search functionality
+        productSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filterProducts(); }
 
-// إضافة الجدول للبانيل
-productPanel.add(productScrollPane, BorderLayout.CENTER);
+            public void filterProducts() {
+                String searchText = productSearchField.getText().toLowerCase();
+                productTableModel.setRowCount(0);
+                for (Product p : inventory.getProducts()) {
+                    if (p.getName().toLowerCase().startsWith(searchText)) {
+                        String special = "";
+                        if (p instanceof Medicine) {
+                            Medicine med = (Medicine) p;
+                            special = med.isPrescriptionRequired() ? "Prescription Required" : "OTC";
+                        } else if (p instanceof Cosmetic) {
+                            Cosmetic cos = (Cosmetic) p;
+                            special = "Skin: " + cos.getSuitableForSkinType();
+                        } else {
+                            special = "N/A";
+                        }
+                        productTableModel.addRow(new Object[]{
+                            p.getProductId(), p.getName(), p.getClass().getSimpleName(),
+                            String.format("$%.2f", p.getPrice()), p.getQuantity(), special
+                        });
+                    }
+                }
+            }
+        });
 
-    refreshProductTable();
-    
-    
-    // Product Form Panel
-    JPanel productFormPanel = createProductFormPanel();
-    productPanel.add(productFormPanel, BorderLayout.NORTH);
-    productPanel.add(productScrollPane, BorderLayout.CENTER);
-    
-    return productPanel;
-}
+        // Product Form Panel
+        JPanel productFormPanel = createProductFormPanel();
+
+        // Combine search and form panels
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(searchPanel, BorderLayout.NORTH);
+        topPanel.add(productFormPanel, BorderLayout.CENTER);
+
+        productPanel.add(topPanel, BorderLayout.NORTH);
+        productPanel.add(productScrollPane, BorderLayout.CENTER);
+
+        return productPanel;
+    }
 
     
     private JPanel createProductFormPanel() {
@@ -449,152 +480,255 @@ productPanel.add(productScrollPane, BorderLayout.CENTER);
     
     private JPanel createSalesPanel() {
         JPanel salesPanel = new JPanel(new BorderLayout(10, 10));
-    salesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-    salesPanel.setBackground(new Color(170, 200, 225));
+        salesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        salesPanel.setBackground(new Color(170, 200, 225));
 
-    // Left side - Available Products
-    JPanel leftPanel = new JPanel(new BorderLayout());
-    leftPanel.setBackground(new Color(170, 200, 225));
+        // Left side - Available Products
+        JPanel leftPanel = new JPanel(new BorderLayout());
+        leftPanel.setBackground(new Color(170, 200, 225));
 
-    availableProductsModel = new DefaultTableModel(new String[]{"ID", "Name", "Price", "Stock"}, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-    };
-    availableProductsTable = new JTable(availableProductsModel);
+        // Search Panel for products
+        JPanel productSearchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        productSearchPanel.setBackground(new Color(170, 200, 225));
+        productSearchPanel.add(new JLabel("Search Products:"));
+        JTextField salesProductSearchField = new JTextField(20);
+        productSearchPanel.add(salesProductSearchField);
 
-    // تنسيق جدول المنتجات
-    availableProductsTable.setBackground(new Color(200, 220, 255));
-    availableProductsTable.setForeground(Color.BLACK);
-    availableProductsTable.setGridColor(new Color(120, 150, 200));
-    availableProductsTable.getTableHeader().setBackground(new Color(70, 130, 180));
-    availableProductsTable.getTableHeader().setForeground(Color.BLACK);
+        availableProductsModel = new DefaultTableModel(new String[]{"ID", "Name", "Price", "Stock"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        availableProductsTable = new JTable(availableProductsModel);
+        availableProductsTable.setBackground(new Color(200, 220, 255));
+        availableProductsTable.setForeground(Color.BLACK);
+        availableProductsTable.setGridColor(new Color(120, 150, 200));
+        availableProductsTable.getTableHeader().setBackground(new Color(70, 130, 180));
+        availableProductsTable.getTableHeader().setForeground(Color.BLACK);
 
-    refreshAvailableProductsTable();
+        refreshAvailableProductsTable();
 
-    JScrollPane availableProductsScrollPane = new JScrollPane(availableProductsTable);
-    availableProductsScrollPane.getViewport().setBackground(new Color(200, 220, 255));
-    availableProductsScrollPane.setBorder(new TitledBorder("Available Products"));
-        
-        JButton addToCartBtn = new JButton("Add to Cart");
-        addToCartBtn.setBackground(new Color(0, 150, 0));
-        addToCartBtn.setForeground(Color.WHITE);
-        addToCartBtn.addActionListener(e -> addToCart());
-        
-        leftPanel.add(availableProductsScrollPane, BorderLayout.CENTER);
-        leftPanel.add(addToCartBtn, BorderLayout.SOUTH);
-        
-        // Right side - Cart and Customer Selection
-        JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
-        rightPanel.setBackground(new Color(170, 200, 225));
-        
-        // Customer Selection
-        JPanel customerSelectionPanel = new JPanel(new FlowLayout());
-        customerSelectionPanel.setBorder(new TitledBorder("Select Customer"));
-        customerSelectionPanel.setBackground(new Color(170, 200, 225));
-        customerComboBox = new JComboBox<>();
-        refreshCustomerComboBox();
-        customerSelectionPanel.add(new JLabel("Customer:"));
-        customerSelectionPanel.add(customerComboBox);
-        
-        // Cart Table
-        cartModel = new DefaultTableModel(new String[]{"Product", "Quantity", "Price", "Subtotal"}, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return column == 1; // Only quantity column editable
-        }
-    };
-    cartTable = new JTable(cartModel);
+        // Add search functionality for sales products
+        salesProductSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filterSalesProducts(); }
 
-    // تنسيق جدول الكارت
-    cartTable.setBackground(new Color(200, 220, 255));
-    cartTable.setForeground(Color.BLACK);
-    cartTable.setGridColor(new Color(120, 150, 200));
-    cartTable.getTableHeader().setBackground(new Color(70, 130, 180));
-    cartTable.getTableHeader().setForeground(Color.BLACK);
+            public void filterSalesProducts() {
+                String searchText = salesProductSearchField.getText().toLowerCase();
+                availableProductsModel.setRowCount(0);
+                for (Product p : inventory.getProducts()) {
+                    if (p.getQuantity() > 0 && p.getName().toLowerCase().startsWith(searchText)) {
+                        availableProductsModel.addRow(new Object[]{
+                            p.getProductId(), p.getName(), 
+                            String.format("$%.2f", p.getPrice()), p.getQuantity()
+                        });
+                    }
+                }
+            }
+        });
 
-    cartTable.getModel().addTableModelListener(e -> {
-        if (e.getColumn() == 1) { // Quantity column changed
-            updateCartQuantity(e.getFirstRow());
-        }
-    });
+        JScrollPane availableProductsScrollPane = new JScrollPane(availableProductsTable);
+        availableProductsScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+        availableProductsScrollPane.setBorder(new TitledBorder("Available Products"));
 
-    JScrollPane cartScrollPane = new JScrollPane(cartTable);
-    cartScrollPane.getViewport().setBackground(new Color(200, 220, 255));
-    cartScrollPane.setBorder(new TitledBorder("Shopping Cart"));
+        leftPanel.add(productSearchPanel, BorderLayout.NORTH);
 
-    // Cart Controls
-    JPanel cartControlsPanel = new JPanel(new BorderLayout());
-    JPanel cartButtonsPanel = new JPanel(new FlowLayout());
-    cartButtonsPanel.setBackground(new Color(170, 200, 225));
-    JButton removeFromCartBtn = new JButton("Remove Selected");
-    removeFromCartBtn.addActionListener(e -> removeFromCart());
-    JButton clearCartBtn = new JButton("Clear Cart");
-    clearCartBtn.addActionListener(e -> clearCart());
-    
-    cartButtonsPanel.add(removeFromCartBtn);
-    cartButtonsPanel.add(clearCartBtn);
-        
-        // Total and Process Order
-        JPanel totalPanel = new JPanel(new BorderLayout());
-        totalPanel.setBackground(new Color(170, 200, 225));
-        totalLabel = new JLabel("Total: $0.00", SwingConstants.RIGHT);
-        totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        
-        JButton processOrderBtn = new JButton("Process Order");
-        processOrderBtn.setBackground(new Color(0, 100, 200));
-        processOrderBtn.setForeground(Color.WHITE);
-        processOrderBtn.setFont(new Font("Arial", Font.BOLD, 14));
-        processOrderBtn.addActionListener(e -> processOrder());
-        
-        totalPanel.add(totalLabel, BorderLayout.NORTH);
-        totalPanel.add(processOrderBtn, BorderLayout.SOUTH);
-        
-        cartControlsPanel.add(cartButtonsPanel, BorderLayout.NORTH);
-        cartControlsPanel.add(totalPanel, BorderLayout.SOUTH);
-        
-        rightPanel.add(customerSelectionPanel, BorderLayout.NORTH);
-        rightPanel.add(cartScrollPane, BorderLayout.CENTER);
-        rightPanel.add(cartControlsPanel, BorderLayout.SOUTH);
-        
-        // Split Pane
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
-        splitPane.setDividerLocation(600);
-        
-        salesPanel.add(splitPane, BorderLayout.CENTER);
-        
-        return salesPanel;
+            JButton addToCartBtn = new JButton("Add to Cart");
+            addToCartBtn.setBackground(new Color(0, 150, 0));
+            addToCartBtn.setForeground(Color.WHITE);
+            addToCartBtn.addActionListener(e -> addToCart());
+
+            leftPanel.add(availableProductsScrollPane, BorderLayout.CENTER);
+            leftPanel.add(addToCartBtn, BorderLayout.SOUTH);
+
+            // Right side - Cart and Customer Selection
+            JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
+            rightPanel.setBackground(new Color(170, 200, 225));
+
+            // Customer Selection
+            JPanel customerSelectionPanel = new JPanel(new FlowLayout());
+            customerSelectionPanel.setBorder(new TitledBorder("Select Customer"));
+            customerSelectionPanel.setBackground(new Color(170, 200, 225));
+            customerComboBox = new JComboBox<>();
+            refreshCustomerComboBox();
+            customerSelectionPanel.add(new JLabel("Customer:"));
+            customerSelectionPanel.add(customerComboBox);
+
+            // Cart Table
+            cartModel = new DefaultTableModel(new String[]{"Product", "Quantity", "Price", "Subtotal"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 1; // Only quantity column editable
+            }
+        };
+        cartTable = new JTable(cartModel);
+
+        // تنسيق جدول الكارت
+        cartTable.setBackground(new Color(200, 220, 255));
+        cartTable.setForeground(Color.BLACK);
+        cartTable.setGridColor(new Color(120, 150, 200));
+        cartTable.getTableHeader().setBackground(new Color(70, 130, 180));
+        cartTable.getTableHeader().setForeground(Color.BLACK);
+
+        cartTable.getModel().addTableModelListener(e -> {
+            if (e.getColumn() == 1) { // Quantity column changed
+                updateCartQuantity(e.getFirstRow());
+            }
+        });
+
+        JScrollPane cartScrollPane = new JScrollPane(cartTable);
+        cartScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+        cartScrollPane.setBorder(new TitledBorder("Shopping Cart"));
+
+        // Cart Controls
+        JPanel cartControlsPanel = new JPanel(new BorderLayout());
+        JPanel cartButtonsPanel = new JPanel(new FlowLayout());
+        cartButtonsPanel.setBackground(new Color(170, 200, 225));
+        JButton removeFromCartBtn = new JButton("Remove Selected");
+        removeFromCartBtn.addActionListener(e -> removeFromCart());
+        JButton clearCartBtn = new JButton("Clear Cart");
+        clearCartBtn.addActionListener(e -> clearCart());
+
+        cartButtonsPanel.add(removeFromCartBtn);
+        cartButtonsPanel.add(clearCartBtn);
+
+            // Total and Process Order
+            JPanel totalPanel = new JPanel(new BorderLayout());
+            totalPanel.setBackground(new Color(170, 200, 225));
+            totalLabel = new JLabel("Total: $0.00", SwingConstants.RIGHT);
+            totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
+
+            JButton processOrderBtn = new JButton("Process Order");
+            processOrderBtn.setBackground(new Color(0, 100, 200));
+            processOrderBtn.setForeground(Color.WHITE);
+            processOrderBtn.setFont(new Font("Arial", Font.BOLD, 14));
+            processOrderBtn.addActionListener(e -> processOrder());
+
+            totalPanel.add(totalLabel, BorderLayout.NORTH);
+            totalPanel.add(processOrderBtn, BorderLayout.SOUTH);
+
+            cartControlsPanel.add(cartButtonsPanel, BorderLayout.NORTH);
+            cartControlsPanel.add(totalPanel, BorderLayout.SOUTH);
+
+            rightPanel.add(customerSelectionPanel, BorderLayout.NORTH);
+            rightPanel.add(cartScrollPane, BorderLayout.CENTER);
+            rightPanel.add(cartControlsPanel, BorderLayout.SOUTH);
+
+            // Split Pane
+            JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
+            splitPane.setDividerLocation(600);
+
+            salesPanel.add(splitPane, BorderLayout.CENTER);
+
+            return salesPanel;
     }
     
+//    private JPanel createOrderHistoryPanel() {
+//        JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
+//        orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+//
+//        orderPanel.setBackground(new Color(170, 200, 225));
+//
+//        // Order History Table
+//        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status"}, 0) {
+//            @Override
+//            public boolean isCellEditable(int row, int column) {
+//                return false;
+//            }
+//        };
+//        orderHistoryTable = new JTable(orderHistoryModel);
+//        orderHistoryTable.setBackground(new Color(200, 220, 255));
+//        orderHistoryTable.setForeground(Color.BLACK);
+//        orderHistoryTable.setGridColor(new Color(120, 150, 200));
+//        orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
+//        orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
+//        JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
+//        orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+//        orderScrollPane.setBorder(new TitledBorder("Order History"));
+//        orderPanel.add(orderScrollPane, BorderLayout.CENTER);
+//
+//        refreshOrderHistoryTable();
+//
+//        return orderPanel;
+//    }
+    // order ditails***
     private JPanel createOrderHistoryPanel() {
-    JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
-    orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-    
-    orderPanel.setBackground(new Color(170, 200, 225));
+        JPanel orderPanel = new JPanel(new BorderLayout(10, 10));
+        orderPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        orderPanel.setBackground(new Color(170, 200, 225));
 
-    // Order History Table
-    orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status"}, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
+        // Order History Table
+        orderHistoryModel = new DefaultTableModel(new String[]{"Order ID", "Customer", "Date", "Total", "Status", "Products"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        orderHistoryTable = new JTable(orderHistoryModel);
+        orderHistoryTable.setBackground(new Color(200, 220, 255));
+        orderHistoryTable.setForeground(Color.BLACK);
+        orderHistoryTable.setGridColor(new Color(120, 150, 200));
+        orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
+        orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
+
+        // Add double-click listener to show full order details
+        orderHistoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    int row = orderHistoryTable.getSelectedRow();
+                    if (row != -1) {
+                        showOrderDetails(row);
+                    }
+                }
+            }
+        });
+
+        JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
+        orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
+        orderScrollPane.setBorder(new TitledBorder("Order History (Double-click for details)"));
+        orderPanel.add(orderScrollPane, BorderLayout.CENTER);
+
+        refreshOrderHistoryTable();
+
+        return orderPanel;
+    }
+    
+    private void showOrderDetails(int orderIndex) {
+        if (orderIndex >= 0 && orderIndex < orders.size()) {
+            Order order = orders.get(orderIndex);
+            order.loadOrderItems(inventory.getProducts());
+
+            StringBuilder details = new StringBuilder();
+            details.append("Order ID: ").append(order.getOrderId()).append("\n");
+            details.append("Customer: ").append(order.getCustomer().getName()).append("\n");
+            details.append("Phone: ").append(order.getCustomer().getPhone()).append("\n");
+            details.append("Date: ").append(order.getOrderDate()).append("\n");
+            details.append("Status: ").append(order.getStatus()).append("\n\n");
+            details.append("Products:\n");
+            details.append("----------------------------------------\n");
+
+            for (OrderItem item : order.getItems()) {
+                details.append(String.format("• %s\n  Qty: %d | Price: $%.2f | Subtotal: $%.2f\n\n", 
+                    item.getProduct().getName(),
+                    item.getQuantity(),
+                    item.getProduct().getPrice(),
+                    item.calculateSubtotal()));
+            }
+
+            details.append("----------------------------------------\n");
+            details.append(String.format("Total Amount: $%.2f", order.getTotalAmount()));
+
+            JTextArea textArea = new JTextArea(details.toString());
+            textArea.setEditable(false);
+            textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(400, 300));
+
+            JOptionPane.showMessageDialog(this, scrollPane, "Order Details", JOptionPane.INFORMATION_MESSAGE);
         }
-    };
-    orderHistoryTable = new JTable(orderHistoryModel);
-    orderHistoryTable.setBackground(new Color(200, 220, 255));
-    orderHistoryTable.setForeground(Color.BLACK);
-    orderHistoryTable.setGridColor(new Color(120, 150, 200));
-    orderHistoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
-    orderHistoryTable.getTableHeader().setForeground(Color.BLACK);
-    JScrollPane orderScrollPane = new JScrollPane(orderHistoryTable);
-    orderScrollPane.getViewport().setBackground(new Color(200, 220, 255));
-    orderScrollPane.setBorder(new TitledBorder("Order History"));
-    orderPanel.add(orderScrollPane, BorderLayout.CENTER);
-    
-    refreshOrderHistoryTable();
-
-    return orderPanel;
-}
+    }
 
     
     // ===================== Event Handlers =====================
@@ -717,47 +851,54 @@ productPanel.add(productScrollPane, BorderLayout.CENTER);
             JOptionPane.showMessageDialog(this, "Please select a product!", "Selection Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
+
         int productId = (Integer) availableProductsModel.getValueAt(selectedRow, 0);
         Product product = inventory.getProductById(productId);
-        
+
         if (product == null || product.getQuantity() <= 0) {
             JOptionPane.showMessageDialog(this, "Product not available!", "Stock Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
+
         String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:", "1");
         if (quantityStr == null) return;
-        
+
         try {
             int quantity = Integer.parseInt(quantityStr);
             if (quantity <= 0) {
                 JOptionPane.showMessageDialog(this, "Quantity must be positive!", "Input Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            
-            if (quantity > product.getQuantity()) {
-                JOptionPane.showMessageDialog(this, "Not enough stock! Available: " + product.getQuantity(), "Stock Error", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            
-            // Check if product already in cart
+
+            // Check current quantity in cart for this product
+            int currentCartQuantity = 0;
             OrderItem existingItem = null;
             for (OrderItem item : currentCart) {
                 if (item.getProduct().getProductId() == productId) {
                     existingItem = item;
+                    currentCartQuantity = item.getQuantity();
                     break;
                 }
             }
-            
+
+            // Check if total quantity (cart + new) exceeds available stock
+            int totalQuantityNeeded = currentCartQuantity + quantity;
+            if (totalQuantityNeeded > product.getQuantity()) {
+                JOptionPane.showMessageDialog(this, 
+                    String.format("Not enough stock! Available: %d, Already in cart: %d, Requesting: %d", 
+                                 product.getQuantity(), currentCartQuantity, quantity), 
+                    "Stock Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             if (existingItem != null) {
-                existingItem.setQuantity(existingItem.getQuantity() + quantity);
+                existingItem.setQuantity(totalQuantityNeeded);
             } else {
                 currentCart.add(new OrderItem(product, quantity));
             }
-            
+
             refreshCartTable();
-            
+
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, "Please enter a valid number!", "Input Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -838,8 +979,8 @@ productPanel.add(productScrollPane, BorderLayout.CENTER);
                 product.setQuantity(product.getQuantity() - item.getQuantity());
             }
             
-            // Clear cart
-            currentCart.clear();
+            // Save inventory changes to file
+            inventory.saveToFile();
             
             // Refresh all displays including dashboard
             refreshCartTable();
@@ -847,6 +988,9 @@ productPanel.add(productScrollPane, BorderLayout.CENTER);
             refreshAvailableProductsTable();
             refreshOrderHistoryTable();
             refreshDashboard(); // Added for dynamic dashboard update
+            
+            // Clear cart
+            currentCart.clear();
             
             // Show success message
             JOptionPane.showMessageDialog(this, 
@@ -967,12 +1111,27 @@ productPanel.add(productScrollPane, BorderLayout.CENTER);
             String totalAmount = String.format("$%.2f", o.getTotalAmount());
             String status = (o.getStatus() != null) ? o.getStatus() : "Pending";
 
+            // Load order items and create product summary
+            o.loadOrderItems(inventory.getProducts());
+            StringBuilder productSummary = new StringBuilder();
+            for (OrderItem item : o.getItems()) {
+                if (productSummary.length() > 0) productSummary.append(", ");
+                productSummary.append(item.getProduct().getName()).append(" (").append(item.getQuantity()).append(")");
+            }
+
+            // Truncate if too long
+            String products = productSummary.toString();
+            if (products.length() > 50) {
+                products = products.substring(0, 47) + "...";
+            }
+
             orderHistoryModel.addRow(new Object[]{
                 o.getOrderId(),
                 customerName,
                 orderDate,
                 totalAmount,
-                status
+                status,
+                products
             });
         }
     }
