@@ -172,16 +172,9 @@ public class Inventory {
     for (int i = 0; i < products.size(); i++) {
         if (products.get(i).getProductId() == productId) {
             products.remove(i);
-            reassignProductIds(); // 🔹 إعادة ترتيب IDs بعد الحذف
             return true;
         }
     }
     return false;
-}
-    public void reassignProductIds() {
-    for (int i = 0; i < products.size(); i++) {
-        products.get(i).setProductId(i + 1); // IDs تبدأ من 1
-    }
-    saveToFile(); // نحفظ الترتيب الجديد
 }
 }

@@ -1581,71 +1581,65 @@ private void loadSelectedProductToForm() {
     
     // ===================== ENHANCED PROCESS ORDER WITH FILE SAVING =====================
     private void processOrder() {
-    if (currentCart.isEmpty()) {
-        JOptionPane.showMessageDialog(this, "Cart is empty!", "Order Error", JOptionPane.WARNING_MESSAGE);
-        return;
-    }
-
-    Customer customer = (Customer) customerComboBox.getSelectedItem();
-    if (customer == null) {
-        JOptionPane.showMessageDialog(this, "Please select a customer!", "Order Error", JOptionPane.WARNING_MESSAGE);
-        return;
-    }
-
-    try {
-        // Create new order
-        Order order = new Order(customer, currentLogin.getUsername());
-
-        // Add items to order and calculate total
-        for (OrderItem item : currentCart) {
-            order.addItem(item.getProduct(), item.getQuantity());
+        if (currentCart.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Cart is empty!", "Order Error", JOptionPane.WARNING_MESSAGE);
+            return;
         }
-
-        // Complete the order (this saves to files)
-        order.completeOrder();
-
-        // Add to current shift orders list
-        orders.add(order);
-
-        // Save current shift orders to file
-        saveCurrentShiftOrders();
-
-        // Deduct stock from inventory
-        for (OrderItem item : currentCart) {
-            Product product = item.getProduct();
-            product.setQuantity(product.getQuantity() - item.getQuantity());
-
-            // 🟢 Remove product completely if quantity becomes 0
-            if (product.getQuantity() == 0) {
-                inventory.removeProduct(product.getProductId());
+        
+        Customer customer = (Customer) customerComboBox.getSelectedItem();
+        if (customer == null) {
+            JOptionPane.showMessageDialog(this, "Please select a customer!", "Order Error", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        try {
+            // Create new order
+            Order order = new Order(customer, currentLogin.getUsername());
+            
+            // Add items to order and calculate total
+            for (OrderItem item : currentCart) {
+                order.addItem(item.getProduct(), item.getQuantity());
             }
+            
+            // Complete the order (this saves to files)
+            order.completeOrder();
+            
+            // Add to current shift orders list
+            orders.add(order);
+            
+            // Save current shift orders to file
+            saveCurrentShiftOrders();
+            
+            // Deduct stock from inventory
+            for (OrderItem item : currentCart) {
+                Product product = item.getProduct();
+                product.setQuantity(product.getQuantity() - item.getQuantity());
+            }
+            
+            // Save inventory changes to file
+            inventory.saveToFile();
+            
+            // Refresh all displays including dashboard
+            refreshCartTable();
+            refreshProductTable();
+            refreshAvailableProductsTable();
+            refreshOrderHistoryTable();
+            refreshDashboard(); // Added for dynamic dashboard update
+            
+            // Clear cart
+            currentCart.clear();
+            
+            // Show success message
+            JOptionPane.showMessageDialog(this, 
+                String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nShift: %s\nSaved to files & current shift", 
+                             order.getOrderId(), order.getTotalAmount(), currentShift.getDisplayName()), 
+                "Success", JOptionPane.INFORMATION_MESSAGE);
+                
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error processing order: " + e.getMessage(), "Order Error", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
-
-        // Save inventory changes to file
-        inventory.saveToFile();
-
-        // Refresh all displays including dashboard
-        refreshCartTable();
-        refreshProductTable();
-        refreshAvailableProductsTable();
-        refreshOrderHistoryTable();
-        refreshDashboard(); // Dynamic dashboard update
-
-        // Clear cart
-        currentCart.clear();
-
-        // Show success message
-        JOptionPane.showMessageDialog(this,
-            String.format("Order processed successfully!\nOrder ID: %d\nTotal: $%.2f\nShift: %s\nSaved to files & current shift",
-                          order.getOrderId(), order.getTotalAmount(), currentShift.getDisplayName()),
-            "Success", JOptionPane.INFORMATION_MESSAGE);
-
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(this, "Error processing order: " + e.getMessage(), "Order Error", JOptionPane.ERROR_MESSAGE);
-        e.printStackTrace();
     }
-}
-
     
     // ===================== Dynamic Dashboard Refresh Method =====================
     private void refreshDashboard() {
