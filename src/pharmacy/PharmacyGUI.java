@@ -43,7 +43,7 @@ public class PharmacyGUI extends JFrame {
     private List<Customer> customers;
     private List<Order> orders;
     private Order currentOrder;
-    
+    private Product currentEditingProduct;
     // GUI Components
     private JTabbedPane mainTabbedPane;
     private JPanel loginPanel, mainPanel;
@@ -733,74 +733,343 @@ public class PharmacyGUI extends JFrame {
         return productPanel;
     }
     
-    private JPanel createProductFormPanel() {
-        JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setBorder(new TitledBorder("Add/Update Product"));
-        formPanel.setBackground(new Color(170, 200, 225));
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        
-        // Product Name
-        gbc.gridx = 0; gbc.gridy = 0;
-        formPanel.add(new JLabel("Name:"), gbc);
-        gbc.gridx = 1;
-        productNameField = new JTextField(15);
-        formPanel.add(productNameField, gbc);
-        
-        // Product Type
-        gbc.gridx = 2;
-        formPanel.add(new JLabel("Type:"), gbc);
-        gbc.gridx = 3;
-        productTypeCombo = new JComboBox<>(new String[]{"Medicine", "Cosmetic"});
-        productTypeCombo.addActionListener(e -> toggleProductSpecificFields());
-        formPanel.add(productTypeCombo, gbc);
-        
-        // Price
-        gbc.gridx = 0; gbc.gridy = 1;
-        formPanel.add(new JLabel("Price:"), gbc);
-        gbc.gridx = 1;
-        productPriceField = new JTextField(15);
-        formPanel.add(productPriceField, gbc);
-        
-        // Quantity
-        gbc.gridx = 2;
-        formPanel.add(new JLabel("Quantity:"), gbc);
-        gbc.gridx = 3;
-        productQuantityField = new JTextField(15);
-        formPanel.add(productQuantityField, gbc);
-        
-        // Medicine specific - Prescription Required
-        gbc.gridx = 0; gbc.gridy = 2;
-        formPanel.add(new JLabel("Prescription Required:"), gbc);
-        gbc.gridx = 1;
-        prescriptionRequiredBox = new JCheckBox();
-        formPanel.add(prescriptionRequiredBox, gbc);
-        
-        // Cosmetic specific - Skin Type
-        gbc.gridx = 2;
-        formPanel.add(new JLabel("Skin Type:"), gbc);
-        gbc.gridx = 3;
-        skinTypeField = new JTextField(15);
-        formPanel.add(skinTypeField, gbc);
-        
-        // Buttons
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        JButton addProductBtn = new JButton("Add Product");
-        addProductBtn.setBackground(new Color(0, 150, 0));
-        addProductBtn.setForeground(Color.WHITE);
-        addProductBtn.addActionListener(e -> addProduct());
-        formPanel.add(addProductBtn, gbc);
-        
-        gbc.gridx = 2; gbc.gridwidth = 2;
-        JButton clearBtn = new JButton("Clear Fields");
-        clearBtn.addActionListener(e -> clearProductFields());
-        formPanel.add(clearBtn, gbc);
-        
-        toggleProductSpecificFields();
-        return formPanel;
+private JPanel createProductFormPanel() {
+    JPanel formPanel = new JPanel(new GridBagLayout());
+    formPanel.setBorder(new TitledBorder("Add/Update Product"));
+    formPanel.setBackground(new Color(170, 200, 225));
+    
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.insets = new Insets(5, 5, 5, 5);
+    
+    // Product Name
+    gbc.gridx = 0; gbc.gridy = 0;
+    formPanel.add(new JLabel("Name:"), gbc);
+    gbc.gridx = 1;
+    productNameField = new JTextField(15);
+    formPanel.add(productNameField, gbc);
+    
+    // Product Type
+    gbc.gridx = 2;
+    formPanel.add(new JLabel("Type:"), gbc);
+    gbc.gridx = 3;
+    productTypeCombo = new JComboBox<>(new String[]{"Medicine", "Cosmetic"});
+    productTypeCombo.addActionListener(e -> toggleProductSpecificFields());
+    formPanel.add(productTypeCombo, gbc);
+    
+    // Price
+    gbc.gridx = 0; gbc.gridy = 1;
+    formPanel.add(new JLabel("Price:"), gbc);
+    gbc.gridx = 1;
+    productPriceField = new JTextField(15);
+    formPanel.add(productPriceField, gbc);
+    
+    // Quantity
+    gbc.gridx = 2;
+    formPanel.add(new JLabel("Quantity:"), gbc);
+    gbc.gridx = 3;
+    productQuantityField = new JTextField(15);
+    formPanel.add(productQuantityField, gbc);
+    
+    // Medicine specific - Prescription Required
+    gbc.gridx = 0; gbc.gridy = 2;
+    formPanel.add(new JLabel("Prescription Required:"), gbc);
+    gbc.gridx = 1;
+    prescriptionRequiredBox = new JCheckBox();
+    formPanel.add(prescriptionRequiredBox, gbc);
+    
+    // Cosmetic specific - Skin Type
+    gbc.gridx = 2;
+    formPanel.add(new JLabel("Skin Type:"), gbc);
+    gbc.gridx = 3;
+    skinTypeField = new JTextField(15);
+    formPanel.add(skinTypeField, gbc);
+    
+    // Buttons Row 1 - Add and Update buttons
+    gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1;
+    JButton addProductBtn = new JButton("Add Product");
+    addProductBtn.setBackground(new Color(0, 150, 0));
+    addProductBtn.setForeground(Color.WHITE);
+    addProductBtn.addActionListener(e -> addProduct());
+    formPanel.add(addProductBtn, gbc);
+    
+    gbc.gridx = 1;
+    JButton updateProductBtn = new JButton("Update Product");
+    updateProductBtn.setBackground(new Color(255, 140, 0)); // Orange color
+    updateProductBtn.setForeground(Color.WHITE);
+    updateProductBtn.addActionListener(e -> updateProduct());
+    formPanel.add(updateProductBtn, gbc);
+    
+    gbc.gridx = 2; gbc.gridwidth = 2;
+    JButton clearBtn = new JButton("Clear Fields");
+    clearBtn.addActionListener(e -> clearProductFields());
+    formPanel.add(clearBtn, gbc);
+    
+    // Buttons Row 2 - Delete and Load functionality
+    gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+    JButton deleteProductBtn = new JButton("Delete Selected Product");
+    deleteProductBtn.setBackground(new Color(200, 50, 50));
+    deleteProductBtn.setForeground(Color.WHITE);
+    deleteProductBtn.addActionListener(e -> deleteSelectedProduct());
+    formPanel.add(deleteProductBtn, gbc);
+    
+    gbc.gridx = 2; gbc.gridwidth = 2;
+    JButton loadProductBtn = new JButton("Load Selected to Form");
+    loadProductBtn.setBackground(new Color(70, 130, 180));
+    loadProductBtn.setForeground(Color.WHITE);
+    loadProductBtn.addActionListener(e -> loadSelectedProductToForm());
+    formPanel.add(loadProductBtn, gbc);
+    
+    toggleProductSpecificFields();
+    return formPanel;
+}
+private void updateProduct() {
+    if (currentEditingProduct == null) {
+        JOptionPane.showMessageDialog(this, 
+            "No product loaded for editing!\n\n" +
+            "To update a product:\n" +
+            "1. Select a product from the table\n" +
+            "2. Click 'Load Selected to Form'\n" +
+            "3. Modify the fields as needed\n" +
+            "4. Click 'Update Product'", 
+            "Update Error", 
+            JOptionPane.WARNING_MESSAGE);
+        return;
     }
     
+    try {
+        String name = productNameField.getText().trim();
+        double price = Double.parseDouble(productPriceField.getText().trim());
+        int quantity = Integer.parseInt(productQuantityField.getText().trim());
+        String type = (String) productTypeCombo.getSelectedItem();
+        
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter product name!", "Input Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        if (price <= 0) {
+            JOptionPane.showMessageDialog(this, "Price must be greater than zero!", "Input Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        if (quantity < 0) {
+            JOptionPane.showMessageDialog(this, "Quantity cannot be negative!", "Input Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // Check if the product type matches
+        boolean typeMatches = (type.equals("Medicine") && currentEditingProduct instanceof Medicine) ||
+                             (type.equals("Cosmetic") && currentEditingProduct instanceof Cosmetic);
+        
+        if (!typeMatches) {
+            JOptionPane.showMessageDialog(this, 
+                "Cannot change product type!\n\n" +
+                "Current product is: " + currentEditingProduct.getClass().getSimpleName() + "\n" +
+                "Selected type: " + type + "\n\n" +
+                "To change type, delete this product and create a new one.", 
+                "Type Change Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // Store old values for comparison
+        String oldName = currentEditingProduct.getName();
+        double oldPrice = currentEditingProduct.getPrice();
+        int oldQuantity = currentEditingProduct.getQuantity();
+        
+        // Update basic product properties
+        currentEditingProduct.setName(name);
+        currentEditingProduct.setPrice(price);
+        currentEditingProduct.setQuantity(quantity);
+        
+        // Update type-specific properties
+        if (currentEditingProduct instanceof Medicine) {
+            Medicine medicine = (Medicine) currentEditingProduct;
+            boolean oldPrescriptionReq = medicine.isPrescriptionRequired();
+            medicine.setPrescriptionRequired(prescriptionRequiredBox.isSelected());
+            System.out.println("Updated Medicine - Prescription required: " + prescriptionRequiredBox.isSelected());
+        } else if (currentEditingProduct instanceof Cosmetic) {
+            Cosmetic cosmetic = (Cosmetic) currentEditingProduct;
+            String skinType = skinTypeField.getText().trim();
+            if (skinType.isEmpty()) skinType = "All";
+            String oldSkinType = cosmetic.getSuitableForSkinType();
+            cosmetic.setSuitableForSkinType(skinType);
+            System.out.println("Updated Cosmetic - Skin type: " + skinType);
+        }
+        
+        // Save to file
+        inventory.saveToFile();
+        
+        // Refresh all tables and dashboard
+        refreshProductTable();
+        refreshAvailableProductsTable();
+        refreshDashboard();
+        
+        // Store product ID before clearing (to avoid null pointer exception)
+        int productId = currentEditingProduct.getProductId();
+        
+        // Clear form and editing state
+        clearProductFields();
+        
+        JOptionPane.showMessageDialog(this, 
+            "Product updated successfully!\n\n" +
+            "Product ID: " + productId + "\n" +
+            "Name: " + name + " (was: " + oldName + ")\n" +
+            "Price: $" + String.format("%.2f", price) + " (was: $" + String.format("%.2f", oldPrice) + ")\n" +
+            "Quantity: " + quantity + " (was: " + oldQuantity + ")", 
+            "Update Successful", 
+            JOptionPane.INFORMATION_MESSAGE);
+        
+        System.out.println("Product updated successfully: ID=" + productId + ", Name=" + name);
+        
+    } catch (NumberFormatException e) {
+        JOptionPane.showMessageDialog(this, 
+            "Please enter valid numbers for price and quantity!\n\n" +
+            "Price: Must be a decimal number (e.g., 15.50)\n" +
+            "Quantity: Must be a whole number (e.g., 100)", 
+            "Input Error", 
+            JOptionPane.ERROR_MESSAGE);
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, 
+            "Error updating product: " + e.getMessage(), 
+            "Update Error", 
+            JOptionPane.ERROR_MESSAGE);
+        e.printStackTrace();
+    }
+}
+
+// Add this new method to handle product deletion:
+private void deleteSelectedProduct() {
+    int selectedRow = productTable.getSelectedRow();
+    if (selectedRow == -1) {
+        JOptionPane.showMessageDialog(this, 
+            "Please select a product to delete!", 
+            "Selection Error", 
+            JOptionPane.WARNING_MESSAGE);
+        return;
+    }
+    
+    // Get the product ID from the selected row
+    int productId = (Integer) productTableModel.getValueAt(selectedRow, 0);
+    String productName = (String) productTableModel.getValueAt(selectedRow, 1);
+    
+    // Find the product in inventory
+    Product productToDelete = inventory.getProductById(productId);
+    if (productToDelete == null) {
+        JOptionPane.showMessageDialog(this, 
+            "Product not found in inventory!", 
+            "Delete Error", 
+            JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Confirm deletion
+    int choice = JOptionPane.showConfirmDialog(this,
+        "Are you sure you want to delete this product?\n\n" +
+        "Product: " + productName + "\n" +
+        "ID: " + productId + "\n" +
+        "Quantity: " + productToDelete.getQuantity() + "\n" +
+        "Price: $" + String.format("%.2f", productToDelete.getPrice()) + "\n\n" +
+        "This action cannot be undone!",
+        "Confirm Product Deletion",
+        JOptionPane.YES_NO_OPTION,
+        JOptionPane.WARNING_MESSAGE);
+    
+    if (choice == JOptionPane.YES_OPTION) {
+        try {
+            // Remove product from inventory
+            boolean removed = inventory.removeProduct(productId);
+            
+            if (removed) {
+                // Save updated inventory to file
+                inventory.saveToFile();
+                
+                // Refresh all relevant tables and UI
+                refreshProductTable();
+                refreshAvailableProductsTable();
+                refreshDashboard();
+                
+                // Clear form fields
+                clearProductFields();
+                
+                // Show success message
+                JOptionPane.showMessageDialog(this, 
+                    "Product '" + productName + "' deleted successfully!", 
+                    "Delete Successful", 
+                    JOptionPane.INFORMATION_MESSAGE);
+                
+                System.out.println("Product deleted: ID=" + productId + ", Name=" + productName);
+                
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Failed to delete product from inventory!", 
+                    "Delete Error", 
+                    JOptionPane.ERROR_MESSAGE);
+            }
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, 
+                "Error deleting product: " + e.getMessage(), 
+                "Delete Error", 
+                JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+}
+private void loadSelectedProductToForm() {
+    int selectedRow = productTable.getSelectedRow();
+    if (selectedRow == -1) {
+        JOptionPane.showMessageDialog(this, 
+            "Please select a product to load!", 
+            "Selection Error", 
+            JOptionPane.WARNING_MESSAGE);
+        return;
+    }
+    
+    // Get product data from table
+    int productId = (Integer) productTableModel.getValueAt(selectedRow, 0);
+    Product product = inventory.getProductById(productId);
+    
+    if (product != null) {
+        // THIS IS THE KEY FIX: Set the currentEditingProduct
+        currentEditingProduct = product;
+        
+        // Load basic product data
+        productNameField.setText(product.getName());
+        productPriceField.setText(String.valueOf(product.getPrice()));
+        productQuantityField.setText(String.valueOf(product.getQuantity()));
+        
+        // Load type-specific data
+        if (product instanceof Medicine) {
+            productTypeCombo.setSelectedItem("Medicine");
+            Medicine medicine = (Medicine) product;
+            prescriptionRequiredBox.setSelected(medicine.isPrescriptionRequired());
+            skinTypeField.setText("");
+        } else if (product instanceof Cosmetic) {
+            productTypeCombo.setSelectedItem("Cosmetic");
+            Cosmetic cosmetic = (Cosmetic) product;
+            skinTypeField.setText(cosmetic.getSuitableForSkinType());
+            prescriptionRequiredBox.setSelected(false);
+        }
+        
+        // Toggle fields based on type
+        toggleProductSpecificFields();
+        
+        JOptionPane.showMessageDialog(this, 
+            "Product data loaded into form!\n" +
+            "Product: " + product.getName() + " (ID: " + product.getProductId() + ")\n" +
+            "You can now modify and click 'Update Product'.", 
+            "Data Loaded for Editing", 
+            JOptionPane.INFORMATION_MESSAGE);
+            
+        System.out.println("Loaded product for editing: ID=" + product.getProductId() + ", Name=" + product.getName());
+    } else {
+        JOptionPane.showMessageDialog(this, 
+            "Product not found in inventory!", 
+            "Load Error", 
+            JOptionPane.ERROR_MESSAGE);
+    }
+}
     private JPanel createCustomerPanel() {
     JPanel customerPanel = new JPanel(new BorderLayout(10, 10));
     customerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -1530,13 +1799,22 @@ public class PharmacyGUI extends JFrame {
     }
     
     private void clearProductFields() {
-        productNameField.setText("");
-        productPriceField.setText("");
-        productQuantityField.setText("");
-        prescriptionRequiredBox.setSelected(false);
-        skinTypeField.setText("");
-        productTypeCombo.setSelectedIndex(0);
-    }
+    productNameField.setText("");
+    productPriceField.setText("");
+    productQuantityField.setText("");
+    prescriptionRequiredBox.setSelected(false);
+    skinTypeField.setText("");
+    productTypeCombo.setSelectedIndex(0);
+    
+    // Clear editing state - THIS IS IMPORTANT
+    currentEditingProduct = null;
+    
+    // Reset field states
+    toggleProductSpecificFields();
+    
+    System.out.println("Product fields cleared and editing state reset");
+}
+    
     
     private void clearCustomerFields() {
         customerNameField.setText("");
